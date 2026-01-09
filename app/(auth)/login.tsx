@@ -8,51 +8,48 @@ import {
   KeyboardAvoidingView, 
   Platform, 
   ActivityIndicator,
-  ScrollView 
+  ScrollView,
+  useWindowDimensions // Import para sa responsiveness
 } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { colors } from "@/constant/colors";
 import { supabase } from "@/constant/supabase";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { width, height } = useWindowDimensions();
+  
+  // Responsive Breakpoints
+  const isMobile = width < 768;
+  const cardWidth = isMobile ? "100%" : 450; // Mas malapad ng konti sa desktop para maganda tignan
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{ message: string; type: "error" | "success" | null }>({
     message: "",
     type: null,
   });
 
-  // 1️⃣ AUTO-LOGOUT FIX: Sa tuwing pupunta sila sa Login screen, 
-  // sisiguraduhin nating malinis ang session para iwas sa "locally stored" problem.
   useEffect(() => {
     supabase.auth.signOut();
   }, []);
 
   const handleLogin = async () => {
     setStatus({ message: "", type: null });
-
     if (!email || !password) {
       return setStatus({ message: "Please enter both email and password", type: "error" });
     }
-
     setLoading(true);
-
     try {
-      // 2️⃣ Auth Login
       const { data, error } = await supabase.auth.signInWithPassword({ 
         email: email.trim().toLowerCase(), 
         password: password 
       });
-
       if (error) throw error;
-
       if (data?.session) {
-        // 3️⃣ Verify if User actually exists in our 'users' table
-        // Ito ang solusyon para kung binura mo sila sa DB, hindi sila makaka-login 
-        // kahit buhay pa ang account nila sa Auth list.
         const { data: userData, error: userError } = await supabase
           .from("users")
           .select("*")
@@ -60,16 +57,13 @@ export default function LoginScreen() {
           .single();
 
         if (userError || !userData) {
-          // Kung wala sa database table, i-logout natin agad sila
           await supabase.auth.signOut();
           throw new Error("Invalid account.");
         }
-
         setStatus({ 
           message: `Welcome back, ${userData?.full_name || 'User'}! Redirecting...`, 
           type: "success" 
         });
-
         setTimeout(() => {
           router.replace("/(tabs)");
         }, 1500);
@@ -88,29 +82,50 @@ export default function LoginScreen() {
     >
       <Stack.Screen options={{ title: "Login", headerShown: false }} />
       
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.card}>
-          <Text style={styles.title}>Welcome Back!</Text>
+      <ScrollView 
+        contentContainerStyle={[
+            styles.scrollContent, 
+            { paddingVertical: isMobile ? 20 : 50 } // Mas malaking padding sa desktop
+        ]} 
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.card, { width: cardWidth }]}>
+          <Text style={[styles.title, isMobile && { fontSize: 24 }]}>Welcome Back!</Text>
           <Text style={styles.subtitle}>Sign in to continue</Text>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor={colors.muted}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            value={email}
-            onChangeText={setEmail}
-          />
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Email Address</Text>
+            <TextInput
+                style={styles.input}
+                placeholder="Enter your email"
+                placeholderTextColor={colors.muted}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={email}
+                onChangeText={setEmail}
+            />
+          </View>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor={colors.muted}
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Password</Text>
+            <View style={styles.passwordContainer}>
+                <TextInput
+                style={[styles.input, { flex: 1, marginBottom: 0, borderWidth: 0 }]}
+                placeholder="Enter your password"
+                placeholderTextColor={colors.muted}
+                secureTextEntry={!showPassword}
+                value={password}
+                onChangeText={setPassword}
+                />
+                <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                    <Ionicons 
+                        name={showPassword ? "eye-outline" : "eye-off-outline"} 
+                        size={22} 
+                        color={colors.muted} 
+                    />
+                </Pressable>
+            </View>
+          </View>
 
           <Pressable
             onPress={handleLogin}
@@ -118,7 +133,7 @@ export default function LoginScreen() {
             style={({ pressed }) => [
               styles.button,
               loading && { opacity: 0.7 },
-              pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
+              pressed && { opacity: 0.8, transform: [{ scale: 0.99 }] },
             ]}
           >
             {loading ? (
@@ -142,33 +157,111 @@ export default function LoginScreen() {
             </View>
           ) : null}
 
-          <Pressable onPress={() => router.push("/(auth)/signup")} style={{ marginTop: 20 }}>
-            <Text style={styles.signupText}>
-              Don't have an account? <Text style={styles.signupLink}>Sign Up</Text>
-            </Text>
-          </Pressable>
+          <View style={styles.footer}>
+            <Text style={styles.signupText}>Don't have an account? </Text>
+            <Pressable onPress={() => router.push("/(auth)/signup")}>
+                <Text style={styles.signupLink}>Sign Up</Text>
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-// ... (KEEP YOUR STYLES UNCHANGED)
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#f5f5f5" },
-  scrollContent: { flexGrow: 1, justifyContent: "center", alignItems: "center", padding: 16 },
-  card: { width: "100%", maxWidth: 400, padding: 32, borderRadius: 20, backgroundColor: "#fff", elevation: 5, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10 },
-  title: { fontSize: 28, fontWeight: "700", color: colors.text, marginBottom: 4, textAlign: "center" },
-  subtitle: { fontSize: 16, color: colors.muted, marginBottom: 24, textAlign: "center" },
-  input: { backgroundColor: "#f9f9f9", paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12, fontSize: 16, marginBottom: 16, borderWidth: 1, borderColor: "#e0e0e0" },
-  button: { backgroundColor: colors.primary, paddingVertical: 16, borderRadius: 12, justifyContent: "center", alignItems: "center", marginTop: 8 },
+  screen: { 
+    flex: 1, 
+    backgroundColor: "#F8FAFC" // Soft grayish blue background
+  },
+  scrollContent: { 
+    flexGrow: 1, 
+    justifyContent: "center", 
+    alignItems: "center", 
+    padding: 16 
+  },
+  card: { 
+    backgroundColor: "#fff", 
+    padding: Platform.OS === 'web' ? 40 : 25, 
+    borderRadius: 24, 
+    // Shadow for Desktop
+    ...Platform.select({
+        web: {
+            boxShadow: "0px 10px 25px rgba(0,0,0,0.05)",
+        },
+        android: { elevation: 4 },
+        ios: {
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.1,
+            shadowRadius: 12,
+        }
+    })
+  },
+  title: { 
+    fontSize: 30, 
+    fontWeight: "800", 
+    color: "#0F172A", 
+    marginBottom: 8, 
+    textAlign: "center" 
+  },
+  subtitle: { 
+    fontSize: 16, 
+    color: "#64748B", 
+    marginBottom: 32, 
+    textAlign: "center" 
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1E293B",
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  input: { 
+    backgroundColor: "#F1F5F9", 
+    paddingVertical: 14, 
+    paddingHorizontal: 16, 
+    borderRadius: 14, 
+    fontSize: 16, 
+    borderWidth: 1, 
+    borderColor: "#E2E8F0",
+    color: "#0F172A"
+  },
+  passwordContainer: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    backgroundColor: "#F1F5F9", 
+    borderRadius: 14, 
+    borderWidth: 1, 
+    borderColor: "#E2E8F0", 
+    paddingRight: 10 
+  },
+  eyeIcon: { padding: 10 },
+  button: { 
+    backgroundColor: colors.primary, 
+    paddingVertical: 18, 
+    borderRadius: 14, 
+    justifyContent: "center", 
+    alignItems: "center", 
+    marginTop: 10,
+  },
   buttonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  statusContainer: { marginTop: 16, padding: 12, borderRadius: 10, borderWidth: 1 },
-  statusText: { fontSize: 14, textAlign: "center", fontWeight: "500" },
-  errorBg: { backgroundColor: "#fee2e2", borderColor: "#fecaca" },
-  errorText: { color: "#dc2626" },
-  successBg: { backgroundColor: "#dcfce7", borderColor: "#bbf7d0" },
-  successText: { color: "#16a34a" },
-  signupText: { textAlign: "center", color: colors.text },
-  signupLink: { color: colors.primary, fontWeight: "600" },
+  statusContainer: { marginTop: 20, padding: 14, borderRadius: 12, borderWidth: 1 },
+  statusText: { fontSize: 14, textAlign: "center", fontWeight: "600" },
+  errorBg: { backgroundColor: "#FEE2E2", borderColor: "#FECACA" },
+  errorText: { color: "#DC2626" },
+  successBg: { backgroundColor: "#DCFCE7", borderColor: "#BBF7D0" },
+  successText: { color: "#16A34A" },
+  footer: { 
+    flexDirection: 'row', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginTop: 25 
+  },
+  signupText: { color: "#64748B", fontSize: 15 },
+  signupLink: { color: colors.primary, fontWeight: "700", fontSize: 15 },
 });

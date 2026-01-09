@@ -15,6 +15,7 @@ import {
 import { Stack, useRouter } from "expo-router";
 import { colors } from "@/constant/colors";
 import { supabase } from "@/constant/supabase";
+import { Ionicons } from "@expo/vector-icons"; // Import Ionicons
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -28,6 +29,9 @@ export default function SignupScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [ministry, setMinistry] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  
+  // NEW STATE: Para sa pag-view ng password
+  const [showPassword, setShowPassword] = useState(false);
   
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{ message: string; type: "error" | "success" | null }>({
@@ -61,7 +65,6 @@ export default function SignupScreen() {
     setLoading(true);
 
     try {
-      // 1️⃣ Auth Signup
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password: password,
@@ -70,7 +73,6 @@ export default function SignupScreen() {
       if (authError) throw authError;
 
       if (authData.user) {
-        // 2️⃣ Database Insert (Public Schema)
         const { error: dbError } = await supabase.from("users").insert([
           { 
             id: authData.user.id, 
@@ -80,16 +82,8 @@ export default function SignupScreen() {
           }
         ]);
 
-        if (dbError) {
-          // Kapag nag-error sa DB pero pasok na sa Auth, baka maging multo ang account.
-          // Optional: handle it here.
-          throw dbError;
-        }
+        if (dbError) throw dbError;
 
-        // 3️⃣ IMPORTANT: Force Sign Out pagkatapos ng signup.
-        // Dahil ang Expo/Web ay laging sinesave ang session agad,
-        // kailangan natin itong linisin para hindi sila maging "locally logged in" 
-        // hangga't hindi sila nag-ve-verify o nag-da-dashboard flow.
         await supabase.auth.signOut();
 
         setStatus({ 
@@ -97,7 +91,6 @@ export default function SignupScreen() {
           type: "success" 
         });
 
-        // I-clear ang form
         setFullName("");
         setEmail("");
         setPassword("");
@@ -145,23 +138,45 @@ export default function SignupScreen() {
             autoCapitalize="none"
           />
 
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor={colors.muted}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
+          {/* PASSWORD FIELD */}
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={[styles.input, { flex: 1, marginBottom: 0, borderWidth: 0 }]}
+              placeholder="Password"
+              placeholderTextColor={colors.muted}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword} // Kapag false ang showPassword, naka-hide ang text
+            />
+            <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+              <Ionicons 
+                // Kapag showPassword ay TRUE (nakikita), gamitin ang "eye"
+                // Kapag showPassword ay FALSE (naka-hide), gamitin ang "eye-off"
+                name={showPassword ? "eye-outline" : "eye-off-outline"} 
+                size={22} 
+                color={colors.muted} 
+              />
+            </Pressable>
+          </View>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Confirm Password"
-            placeholderTextColor={colors.muted}
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            secureTextEntry
-          />
+          {/* CONFIRM PASSWORD FIELD */}
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={[styles.input, { flex: 1, marginBottom: 0, borderWidth: 0 }]}
+              placeholder="Confirm Password"
+              placeholderTextColor={colors.muted}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry={!showPassword}
+            />
+            <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+              <Ionicons 
+                name={showPassword ? "eye-outline" : "eye-off-outline"} 
+                size={22} 
+                color={colors.muted} 
+              />
+            </Pressable>
+          </View>
 
           <Pressable style={styles.dropdownHeader} onPress={toggleDropdown}>
             <Text style={ministry ? styles.dropdownTextSelected : styles.dropdownPlaceholder}>
@@ -230,6 +245,20 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: "700", color: colors.text, textAlign: "center" },
   subtitle: { fontSize: 16, color: colors.muted, marginBottom: 24, textAlign: "center" },
   input: { backgroundColor: "#f9f9f9", padding: 14, borderRadius: 12, fontSize: 16, marginBottom: 16, borderWidth: 1, borderColor: "#e0e0e0" },
+  
+  // NEW STYLES: Para sa Password container
+  passwordContainer: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    backgroundColor: "#f9f9f9", 
+    borderRadius: 12, 
+    borderWidth: 1, 
+    borderColor: "#e0e0e0", 
+    marginBottom: 16,
+    paddingRight: 10 
+  },
+  eyeIcon: { padding: 5 },
+
   dropdownHeader: { padding: 14, borderRadius: 12, borderWidth: 1, borderColor: "#e0e0e0", backgroundColor: "#f9f9f9", marginBottom: 8 },
   dropdownPlaceholder: { color: colors.muted },
   dropdownTextSelected: { color: colors.text },

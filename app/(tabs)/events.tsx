@@ -1,12 +1,13 @@
-import React, { useState, useCallback } from "react"; // Idinagdag ang useCallback
+import React, { useState, useCallback } from "react";
 import { 
   View, Text, StyleSheet, ScrollView, 
-  Pressable, ActivityIndicator, Image, Modal 
+  Pressable, ActivityIndicator, Image, Modal,
+  useWindowDimensions // Idinagdag para sa responsiveness
 } from "react-native";
 import { colors } from "@/constant/colors";
 import { supabase } from "@/constant/supabase";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router"; // Idinagdag para sa auto-refresh logic
+import { useFocusEffect } from "expo-router";
 
 interface EventItem {
   id: string;
@@ -20,6 +21,9 @@ interface EventItem {
 }
 
 export default function EventsScreen() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768; // Mobile breakpoint
+
   const [activeTab, setActiveTab] = useState<'upcoming' | 'memories'>('upcoming');
   const [upcomingEvents, setUpcomingEvents] = useState<EventItem[]>([]);
   const [pastEvents, setPastEvents] = useState<EventItem[]>([]);
@@ -28,11 +32,9 @@ export default function EventsScreen() {
 
   const PLACEHOLDER_IMG = 'https://images.unsplash.com/photo-1438232992991-995b7058bbb3?q=80&w=800';
 
-  // --- AUTO-REFRESH LOGIC ---
   useFocusEffect(
     useCallback(() => {
       fetchEvents();
-
       const subscription = supabase
         .channel('realtime-events-v3')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => fetchEvents())
@@ -62,22 +64,22 @@ export default function EventsScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      {/* HEADER SECTION */}
-      <View style={styles.header}>
+    <View style={[styles.container, isMobile && { padding: 15 }]}>
+      {/* HEADER SECTION - Responsive direction */}
+      <View style={[styles.header, isMobile && { flexDirection: 'column', alignItems: 'flex-start', gap: 20 }]}>
         <View>
-          <Text style={styles.title}>Church Events</Text>
+          <Text style={[styles.title, isMobile && { fontSize: 26 }]}>Church Events</Text>
           <Text style={styles.subtitle}>
-            {activeTab === 'upcoming' ? "Join our upcoming gatherings" : "Memories of our faith journey"}
+            {activeTab === 'upcoming' ? "Join our gatherings" : "Our faith journey"}
           </Text>
         </View>
         
-        <View style={styles.tabContainer}>
-          <Pressable style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]} onPress={() => setActiveTab('upcoming')}>
-            <Text style={[styles.tabText, activeTab === 'upcoming' && styles.activeTabText]}>Upcoming</Text>
+        <View style={[styles.tabContainer, isMobile && { width: '100%' }]}>
+          <Pressable style={[styles.tab, activeTab === 'upcoming' && styles.activeTab, isMobile && { flex: 1 }]} onPress={() => setActiveTab('upcoming')}>
+            <Text style={[styles.tabText, activeTab === 'upcoming' && styles.activeTabText, isMobile && { textAlign: 'center' }]}>Upcoming</Text>
           </Pressable>
-          <Pressable style={[styles.tab, activeTab === 'memories' && styles.activeTab]} onPress={() => setActiveTab('memories')}>
-            <Text style={[styles.tabText, activeTab === 'memories' && styles.activeTabText]}>Memories</Text>
+          <Pressable style={[styles.tab, activeTab === 'memories' && styles.activeTab, isMobile && { flex: 1 }]} onPress={() => setActiveTab('memories')}>
+            <Text style={[styles.tabText, activeTab === 'memories' && styles.activeTabText, isMobile && { textAlign: 'center' }]}>Memories</Text>
           </Pressable>
         </View>
       </View>
@@ -92,18 +94,18 @@ export default function EventsScreen() {
               <View style={styles.center}><Text style={styles.emptyText}>No events scheduled yet.</Text></View>
             ) : (
               upcomingEvents.map((item) => (
-                <View key={item.id} style={styles.eventCard}>
+                <View key={item.id} style={[styles.eventCard, isMobile && { flexDirection: 'column', alignItems: 'flex-start' }]}>
                   {/* DATE BADGE */}
-                  <View style={styles.dateBox}>
+                  <View style={[styles.dateBox, isMobile && { flexDirection: 'row', width: '100%', gap: 10, minWidth: 0, marginBottom: 15 }]}>
                     <Text style={styles.month}>{new Date(item.target_date).toLocaleString('default', { month: 'short' })}</Text>
-                    <Text style={styles.day}>{new Date(item.target_date).getDate()}</Text>
+                    <Text style={[styles.day, isMobile && { fontSize: 20 }]}>{new Date(item.target_date).getDate()}</Text>
                   </View>
 
-                  <View style={styles.details}>
-                    <Text style={styles.cardTitle}>{item.title}</Text>
-                    <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
+                  <View style={[styles.details, isMobile && { marginLeft: 0 }]}>
+                    <Text style={[styles.cardTitle, isMobile && { fontSize: 18 }]}>{item.title}</Text>
+                    <Text style={styles.cardDesc} numberOfLines={3}>{item.description}</Text>
                     
-                    <View style={styles.metaRow}>
+                    <View style={[styles.metaRow, isMobile && { flexWrap: 'wrap' }]}>
                       <View style={styles.metaItem}>
                         <Ionicons name="time-outline" size={16} color={colors.primary} />
                         <Text style={styles.metaText}>{item.target_time || "TBA"}</Text>
@@ -120,9 +122,9 @@ export default function EventsScreen() {
           )}
 
           {activeTab === 'memories' && (
-            <View style={styles.memoryGrid}>
+            <View style={[styles.memoryGrid, isMobile && { flexDirection: 'column' }]}>
               {pastEvents.map((m) => (
-                <Pressable key={m.id} style={styles.memoryCard} onPress={() => setSelectedMemory(m)}>
+                <Pressable key={m.id} style={[styles.memoryCard, isMobile && { width: '100%' }]} onPress={() => setSelectedMemory(m)}>
                   <Image source={{ uri: m.image_url || PLACEHOLDER_IMG }} style={styles.memoryImg} />
                   <View style={styles.memoryOverlay}>
                     <Text style={styles.memoryTitle}>{m.title}</Text>
@@ -135,28 +137,28 @@ export default function EventsScreen() {
         </ScrollView>
       )}
 
-      {/* DETAILED MODAL */}
+      {/* DETAILED MODAL - Responsive Width */}
       <Modal visible={!!selectedMemory} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, isMobile && { width: '92%', borderRadius: 20 }]}>
             {selectedMemory && (
-              <>
-                <Image source={{ uri: selectedMemory.image_url || PLACEHOLDER_IMG }} style={styles.modalImg} />
+              <ScrollView bounces={false}>
+                <Image source={{ uri: selectedMemory.image_url || PLACEHOLDER_IMG }} style={[styles.modalImg, isMobile && { height: 250 }]} />
                 <Pressable style={styles.closeIcon} onPress={() => setSelectedMemory(null)}>
                   <Ionicons name="close-circle" size={35} color="#fff" />
                 </Pressable>
-                <View style={styles.modalTextContent}>
+                <View style={[styles.modalTextContent, isMobile && { padding: 20 }]}>
                   <View style={styles.modalBadge}><Text style={styles.modalBadgeText}>PAST EVENT</Text></View>
-                  <Text style={styles.modalTitle}>{selectedMemory.title}</Text>
+                  <Text style={[styles.modalTitle, isMobile && { fontSize: 22 }]}>{selectedMemory.title}</Text>
                   
-                  <View style={styles.modalMeta}>
+                  <View style={[styles.modalMeta, isMobile && { flexDirection: 'column', gap: 5 }]}>
                      <Text style={styles.modalMetaLabel}>DATE: <Text style={styles.modalMetaVal}>{new Date(selectedMemory.target_date).toLocaleDateString()}</Text></Text>
                      <Text style={styles.modalMetaLabel}>TIME: <Text style={styles.modalMetaVal}>{selectedMemory.target_time || "---"}</Text></Text>
                   </View>
 
                   <Text style={styles.modalInfo}>{selectedMemory.description || "No description provided."}</Text>
                 </View>
-              </>
+              </ScrollView>
             )}
           </View>
         </View>
@@ -198,7 +200,7 @@ const styles = StyleSheet.create({
   memoryDate: { color: '#E2E8F0', fontSize: 12, marginTop: 5 },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: 600, backgroundColor: '#fff', borderRadius: 35, overflow: 'hidden' },
+  modalContent: { width: 600, backgroundColor: '#fff', borderRadius: 35, overflow: 'hidden', maxHeight: '90%' },
   modalImg: { width: '100%', height: 350 },
   closeIcon: { position: 'absolute', top: 25, right: 25 },
   modalTextContent: { padding: 35 },
