@@ -15,7 +15,8 @@ import {
 import { Stack, useRouter } from "expo-router";
 import { colors } from "@/constant/colors";
 import { supabase } from "@/constant/supabase";
-import { Ionicons } from "@expo/vector-icons"; // Import Ionicons
+import { Ionicons } from "@expo/vector-icons";
+import * as Linking from 'expo-linking';
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -29,11 +30,9 @@ export default function SignupScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [ministry, setMinistry] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  
-  // NEW STATE: Para sa pag-view ng password
   const [showPassword, setShowPassword] = useState(false);
-  
   const [loading, setLoading] = useState(false);
+  
   const [status, setStatus] = useState<{ message: string; type: "error" | "success" | null }>({
     message: "",
     type: null,
@@ -54,6 +53,7 @@ export default function SignupScreen() {
   const handleSignup = async () => {
     setStatus({ message: "", type: null });
 
+    // Basic Validation
     if (!fullName || !email || !password || !confirmPassword || !ministry) {
       return setStatus({ message: "Please fill all fields", type: "error" });
     }
@@ -65,14 +65,27 @@ export default function SignupScreen() {
     setLoading(true);
 
     try {
+      const redirectTo = Linking.createURL("/(auth)/login");
+
+      // 1. SUPABASE AUTH SIGNUP
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password: password,
+        options: {
+          emailRedirectTo: redirectTo,
+        },
       });
 
-      if (authError) throw authError;
+      // Catching Auth Errors (Example: User already exists but not confirmed)
+      if (authError) {
+        if (authError.message.includes("already registered")) {
+          throw new Error("This email is already registered. Please login instead.");
+        }
+        throw authError;
+      }
 
       if (authData.user) {
+        // 2. INSERT TO PUBLIC USERS TABLE
         const { error: dbError } = await supabase.from("users").insert([
           { 
             id: authData.user.id, 
@@ -82,27 +95,38 @@ export default function SignupScreen() {
           }
         ]);
 
-        if (dbError) throw dbError;
-
-        await supabase.auth.signOut();
-
+        if (dbError) {
+          // HANDLE 409 CONFLICT (Duplicate Key/Email)
+          if (dbError.code === "23505") { 
+            throw new Error("Email already exists in our records.");
+          }
+          throw dbError;
+        }
+        
         setStatus({ 
-          message: "Signup successful! Please check your email and verify your account before logging in.", 
+          message: "Account created! Please check your email to confirm your signup.", 
           type: "success" 
         });
 
+        // Optional: Clear fields on success
         setFullName("");
         setEmail("");
         setPassword("");
         setConfirmPassword("");
         setMinistry("");
-        
-        setTimeout(() => {
-            router.push("/(auth)/login");
-        }, 3500);
       }
     } catch (error: any) {
-      setStatus({ message: error.message, type: "error" });
+      // Map technical errors to user-friendly messages
+      let friendlyMessage = error.message;
+      
+      if (error.message.includes("network") || error.status === 0) {
+        friendlyMessage = "Connection error. Please check your internet.";
+      }
+
+      setStatus({ 
+        message: friendlyMessage, 
+        type: "error" 
+      });
     } finally {
       setLoading(false);
     }
@@ -113,7 +137,7 @@ export default function SignupScreen() {
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <ScrollView contentContainerStyle={styles.screen}>
+      <ScrollView contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
         <Stack.Screen options={{ title: "Sign Up", headerShown: false }} />
 
         <View style={styles.card}>
@@ -123,7 +147,7 @@ export default function SignupScreen() {
           <TextInput
             style={styles.input}
             placeholder="Full Name"
-            placeholderTextColor={colors.muted}
+            placeholderTextColor="#94a3b8"
             value={fullName}
             onChangeText={setFullName}
           />
@@ -131,40 +155,36 @@ export default function SignupScreen() {
           <TextInput
             style={styles.input}
             placeholder="Email"
-            placeholderTextColor={colors.muted}
+            placeholderTextColor="#94a3b8"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
           />
 
-          {/* PASSWORD FIELD */}
           <View style={styles.passwordContainer}>
             <TextInput
               style={[styles.input, { flex: 1, marginBottom: 0, borderWidth: 0 }]}
               placeholder="Password"
-              placeholderTextColor={colors.muted}
+              placeholderTextColor="#94a3b8"
               value={password}
               onChangeText={setPassword}
-              secureTextEntry={!showPassword} // Kapag false ang showPassword, naka-hide ang text
+              secureTextEntry={!showPassword}
             />
             <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
               <Ionicons 
-                // Kapag showPassword ay TRUE (nakikita), gamitin ang "eye"
-                // Kapag showPassword ay FALSE (naka-hide), gamitin ang "eye-off"
                 name={showPassword ? "eye-outline" : "eye-off-outline"} 
-                size={22} 
-                color={colors.muted} 
+                size={20} 
+                color="#64748B" 
               />
             </Pressable>
           </View>
 
-          {/* CONFIRM PASSWORD FIELD */}
           <View style={styles.passwordContainer}>
             <TextInput
               style={[styles.input, { flex: 1, marginBottom: 0, borderWidth: 0 }]}
               placeholder="Confirm Password"
-              placeholderTextColor={colors.muted}
+              placeholderTextColor="#94a3b8"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry={!showPassword}
@@ -172,8 +192,8 @@ export default function SignupScreen() {
             <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
               <Ionicons 
                 name={showPassword ? "eye-outline" : "eye-off-outline"} 
-                size={22} 
-                color={colors.muted} 
+                size={20} 
+                color="#64748B" 
               />
             </Pressable>
           </View>
@@ -182,6 +202,7 @@ export default function SignupScreen() {
             <Text style={ministry ? styles.dropdownTextSelected : styles.dropdownPlaceholder}>
               {ministry || "Select Ministry"}
             </Text>
+            <Ionicons name={dropdownOpen ? "chevron-up" : "chevron-down"} size={18} color="#64748B" />
           </Pressable>
 
           {dropdownOpen && (
@@ -203,7 +224,10 @@ export default function SignupScreen() {
           )}
 
           <Pressable
-            style={[styles.button, loading && { opacity: 0.7 }]}
+            style={({ pressed }) => [
+              styles.button, 
+              (loading || pressed) && { opacity: 0.8 }
+            ]}
             onPress={handleSignup}
             disabled={loading}
           >
@@ -219,6 +243,12 @@ export default function SignupScreen() {
                 styles.statusContainer, 
                 status.type === "error" ? styles.errorBg : styles.successBg
             ]}>
+              <Ionicons 
+                name={status.type === "error" ? "alert-circle" : "checkmark-circle"} 
+                size={18} 
+                color={status.type === "error" ? "#dc2626" : "#16a34a"} 
+                style={{marginRight: 8}}
+              />
               <Text style={[
                 styles.statusText, 
                 status.type === "error" ? styles.errorText : styles.successText
@@ -228,7 +258,7 @@ export default function SignupScreen() {
             </View>
           ) : null}
 
-          <Pressable onPress={() => router.push("/(auth)/login")} style={{ marginTop: 10 }}>
+          <Pressable onPress={() => router.push("/(auth)/login")} style={{ marginTop: 20 }}>
             <Text style={styles.loginText}>
               Already have an account? <Text style={styles.loginLink}>Login</Text>
             </Text>
@@ -240,41 +270,43 @@ export default function SignupScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flexGrow: 1, justifyContent: "center", alignItems: "center", padding: 16, backgroundColor: "#f5f5f5" },
-  card: { width: "100%", maxWidth: 400, padding: 32, borderRadius: 20, backgroundColor: "#fff", elevation: 5 },
-  title: { fontSize: 28, fontWeight: "700", color: colors.text, textAlign: "center" },
-  subtitle: { fontSize: 16, color: colors.muted, marginBottom: 24, textAlign: "center" },
-  input: { backgroundColor: "#f9f9f9", padding: 14, borderRadius: 12, fontSize: 16, marginBottom: 16, borderWidth: 1, borderColor: "#e0e0e0" },
+  screen: { flexGrow: 1, justifyContent: "center", alignItems: "center", padding: 16, backgroundColor: "#f8f9fa" },
+  card: { width: "100%", maxWidth: 400, padding: 24, borderRadius: 24, backgroundColor: "#fff", elevation: 4, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 10, shadowOffset: {width: 0, height: 4} },
+  title: { fontSize: 24, fontWeight: "800", color: "#1E293B", textAlign: "center" },
+  subtitle: { fontSize: 14, color: "#64748B", marginBottom: 24, textAlign: "center" },
+  input: { backgroundColor: "#f8fafc", padding: 12, borderRadius: 12, fontSize: 15, marginBottom: 14, borderWidth: 1, borderColor: "#e2e8f0", color: "#1e293b" },
   
-  // NEW STYLES: Para sa Password container
   passwordContainer: { 
     flexDirection: "row", 
     alignItems: "center", 
-    backgroundColor: "#f9f9f9", 
+    backgroundColor: "#f8fafc", 
     borderRadius: 12, 
     borderWidth: 1, 
-    borderColor: "#e0e0e0", 
-    marginBottom: 16,
-    paddingRight: 10 
+    borderColor: "#e2e8f0", 
+    marginBottom: 14,
+    paddingRight: 12 
   },
-  eyeIcon: { padding: 5 },
+  eyeIcon: { padding: 4 },
 
-  dropdownHeader: { padding: 14, borderRadius: 12, borderWidth: 1, borderColor: "#e0e0e0", backgroundColor: "#f9f9f9", marginBottom: 8 },
-  dropdownPlaceholder: { color: colors.muted },
-  dropdownTextSelected: { color: colors.text },
-  dropdownContainer: { maxHeight: 150, marginBottom: 16, borderRadius: 12, backgroundColor: "#f9f9f9", borderWidth: 1, borderColor: "#e0e0e0" },
-  scrollDropdown: { padding: 8 },
-  dropdownItem: { padding: 12, borderRadius: 10, marginBottom: 4 },
+  dropdownHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: "#e2e8f0", backgroundColor: "#f8fafc", marginBottom: 8 },
+  dropdownPlaceholder: { color: "#94a3b8", fontSize: 15 },
+  dropdownTextSelected: { color: "#1e293b", fontSize: 15 },
+  dropdownContainer: { maxHeight: 150, marginBottom: 16, borderRadius: 12, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e2e8f0", overflow: 'hidden' },
+  scrollDropdown: { padding: 4 },
+  dropdownItem: { padding: 10, borderRadius: 8, marginBottom: 2 },
   dropdownItemSelected: { backgroundColor: colors.primary },
-  dropdownText: { color: colors.text },
-  button: { backgroundColor: colors.primary, padding: 16, borderRadius: 12, alignItems: "center", marginTop: 10 },
+  dropdownText: { color: "#475569", fontSize: 14 },
+
+  button: { backgroundColor: colors.primary, padding: 16, borderRadius: 14, alignItems: "center", marginTop: 10, shadowColor: colors.primary, shadowOpacity: 0.3, shadowRadius: 5, shadowOffset: {width: 0, height: 4} },
   buttonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  statusContainer: { marginTop: 16, padding: 12, borderRadius: 8, borderWidth: 1 },
-  statusText: { fontSize: 14, textAlign: "center", fontWeight: "500" },
-  errorBg: { backgroundColor: "#fee2e2", borderColor: "#fecaca" },
+
+  statusContainer: { marginTop: 16, padding: 12, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center' },
+  statusText: { fontSize: 13, flex: 1, fontWeight: "600" },
+  errorBg: { backgroundColor: "#fef2f2", borderColor: "#fee2e2" },
   errorText: { color: "#dc2626" },
-  successBg: { backgroundColor: "#dcfce7", borderColor: "#bbf7d0" },
+  successBg: { backgroundColor: "#f0fdf4", borderColor: "#dcfce7" },
   successText: { color: "#16a34a" },
-  loginText: { textAlign: "center", color: colors.text, marginTop: 10 },
-  loginLink: { color: colors.primary, fontWeight: "600" },
+
+  loginText: { textAlign: "center", color: "#64748B", fontSize: 14 },
+  loginLink: { color: colors.primary, fontWeight: "700" },
 });
