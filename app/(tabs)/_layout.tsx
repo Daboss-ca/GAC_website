@@ -7,31 +7,44 @@ import {
   useWindowDimensions, 
   ScrollView,
   LayoutAnimation,
-  Platform 
+  Platform
 } from "react-native";
 import { Tabs, useRouter, usePathname } from "expo-router";
 import { colors } from "@/constant/colors";
-import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/constant/supabase";
+
+// --- IMPORT LUCIDE ICONS ---
+import { 
+  LayoutGrid, 
+  Calendar, 
+  Megaphone, 
+  Music, 
+  LogOut, 
+  ArrowLeftCircle, 
+  AlertCircle,
+  Users,
+  UserCircle // Idinagdag para sa Profile
+} from 'lucide-react-native';
 
 export default function TabLayout() {
   const router = useRouter();
   const pathname = usePathname();
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
   
-  const isMobile = width < 768;
-  const isSmallPhone = width < 380; // Para sa mga extra small na screens
-
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const navItems = [
-    { name: "Dashboard", icon: "grid-outline", path: "/(tabs)" },
-    { name: "Events", icon: "calendar-outline", path: "/(tabs)/events" },
-    { name: "Announcements", icon: "megaphone-outline", path: "/(tabs)/announcements" },
-    { name: "Song Lineups", icon: "musical-notes-outline", path: "/(tabs)/song-lineups" },
-  ];
+  const isMobile = width < 768;
+  const isSmallPhone = width < 380;
 
-  const isMembersPage = pathname.includes("members");
+  // --- UPDATED NAV ITEMS (Kasama na ang Profile) ---
+  const navItems = [
+    { name: "Dashboard", icon: LayoutGrid, path: "/(tabs)" },
+    { name: "Events", icon: Calendar, path: "/(tabs)/events" },
+    { name: "Announcements", icon: Megaphone, path: "/(tabs)/announcements" },
+    { name: "Song Lineups", icon: Music, path: "/(tabs)/song-lineups" },
+    { name: "Team", icon: Users, path: "/(tabs)/members" }, 
+    { name: "Profile", icon: UserCircle, path: "/(tabs)/profile" }, // BAGONG ITEM
+  ];
 
   const navigateTo = (path: string) => {
     if (Platform.OS !== 'web') {
@@ -51,29 +64,21 @@ export default function TabLayout() {
         
         {/* --- NAVIGATION BAR --- */}
         <View style={[styles.sidebar, isMobile && styles.topNav]}>
-          
           <View style={[styles.logoSection, isMobile && { marginBottom: 0, marginRight: 10 }]}>
-            {!isMobile && <Text style={styles.logoText}>Great Awakening</Text>}
+            {!isMobile && (
+              <View>
+                <Text style={styles.logoText}>Great Awakening</Text>
+                <Text style={styles.logoSub}>Love God&Love people</Text>
+              </View>
+            )}
           </View>
 
           <View style={[styles.navGroup, isMobile && styles.navGroupMobile]}>
             <ScrollView horizontal={isMobile} showsHorizontalScrollIndicator={false}>
-              {isMembersPage && (
-                <Pressable
-                  onPress={() => navigateTo("/(tabs)")}
-                  style={[styles.navItem, styles.backNavButton, isMobile && styles.mobileNavItem]}
-                >
-                  <Ionicons name="arrow-back-circle" size={isMobile ? 18 : 22} color="#fff" />
-                  <Text style={[styles.navLabel, isMobile && styles.mobileNavLabel, { color: "#fff" }]}>Back</Text>
-                </Pressable>
-              )}
-
               {navItems.map((item) => {
                 const cleanPath = item.path.replace("/(tabs)", "") || "/";
                 const cleanCurrentPath = pathname.replace("/(tabs)", "") || "/";
                 const isActive = cleanCurrentPath === cleanPath;
-
-                if (isMembersPage && item.name === "Dashboard") return null;
 
                 return (
                   <Pressable
@@ -82,46 +87,42 @@ export default function TabLayout() {
                     style={[
                       styles.navItem,
                       isMobile && styles.mobileNavItem,
-                      isMobile && !isActive && styles.inactiveLift,
-                      isActive && !isMembersPage && { backgroundColor: colors?.primary || "#4F46E5" }
+                      isActive && { backgroundColor: "#0F172A" } 
                     ]}
                   >
-                    <Ionicons
-                      name={item.icon as any}
-                      size={isMobile ? (isSmallPhone ? 16 : 18) : 22} // Responsive icon size
-                      color={isActive && !isMembersPage ? "#fff" : "#64748B"}
+                    <item.icon 
+                      size={isMobile ? (isSmallPhone ? 14 : 16) : 20} 
+                      color={isActive ? "#fff" : "#94A3B8"} 
+                      strokeWidth={2.5}
                     />
-                    {(isActive || !isMobile) && (
-                      <Text style={[
-                        styles.navLabel, 
-                        isMobile && styles.mobileNavLabel,
-                        isActive && !isMembersPage && { color: "#fff" }
-                      ]}>
-                        {item.name}
-                      </Text>
-                    )}
+                    
+                    <Text style={[
+                      styles.navLabel, 
+                      isMobile && styles.mobileNavLabel,
+                      isActive && { color: "#fff", fontWeight: '800' }
+                    ]}>
+                      {item.name.toUpperCase()}
+                    </Text>
                   </Pressable>
                 );
               })}
             </ScrollView>
           </View>
 
-          {/* LOGOUT BUTTON - Responsiveized */}
           <Pressable 
             style={({ pressed }) => [
               styles.logoutBtn, 
               isMobile && styles.logoutBtnMobile,
-              { backgroundColor: pressed ? "#FEE2E2" : "#FFF5F5" }
+              { backgroundColor: pressed ? "#F8FAFC" : "#fff" }
             ]} 
             onPress={() => setShowConfirm(true)}
           >
-            <View style={[styles.logoutIconContainer, isMobile && { padding: 4 }]}>
-              <Ionicons name="log-out-outline" size={isMobile ? 16 : 20} color="#dc2626" />
-            </View>
-            {!isMobile && <Text style={styles.logoutText}>Logout</Text>}
+            <LogOut size={isMobile ? 16 : 18} color="#dc2626" />
+            {!isMobile && <Text style={styles.logoutText}>Sign Out</Text>}
           </Pressable>
         </View>
 
+        {/* --- CONTENT AREA --- */}
         <View style={styles.contentContainer}>
           <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: "none" } }}>
             <Tabs.Screen name="index" />
@@ -129,23 +130,24 @@ export default function TabLayout() {
             <Tabs.Screen name="announcements" />
             <Tabs.Screen name="song-lineups" />
             <Tabs.Screen name="members" /> 
+            <Tabs.Screen name="profile" /> {/* IDINAGDAG NA SCREEN */}
           </Tabs>
         </View>
       </View>
 
-      {/* CONFIRMATION OVERLAY */}
+      {/* --- CONFIRMATION OVERLAY --- */}
       {showConfirm && (
         <View style={[StyleSheet.absoluteFill, styles.overlay]}>
           <View style={styles.confirmCard}>
-            <Ionicons name="alert-circle" size={isMobile ? 32 : 40} color="#dc2626" style={{ marginBottom: 10 }} />
-            <Text style={styles.confirmTitle}>Confirm Logout</Text>
-            <Text style={styles.confirmSub}>Are you sure you want to sign out?</Text>
+            <AlertCircle size={40} color="#0F172A" />
+            <Text style={styles.confirmTitle}>Confirm Sign Out</Text>
+            <Text style={styles.confirmSub}>Are you sure you want to end your session?</Text>
             <View style={styles.confirmRow}>
-              <Pressable style={[styles.confirmBtn, { backgroundColor: "#dc2626" }]} onPress={processLogout}>
-                <Text style={{ color: "#fff", fontWeight: "bold", fontSize: isMobile ? 12 : 14 }}>Logout</Text>
+              <Pressable style={[styles.confirmBtn, { backgroundColor: "#0F172A" }]} onPress={processLogout}>
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}>YES, LOGOUT</Text>
               </Pressable>
-              <Pressable style={[styles.confirmBtn, { backgroundColor: "#E2E8F0" }]} onPress={() => setShowConfirm(false)}>
-                <Text style={{ color: "#475569", fontWeight: "bold", fontSize: isMobile ? 12 : 14 }}>Cancel</Text>
+              <Pressable style={[styles.confirmBtn, { backgroundColor: "#F1F5F9" }]} onPress={() => setShowConfirm(false)}>
+                <Text style={{ color: "#475569", fontWeight: "800", fontSize: 12 }}>CANCEL</Text>
               </Pressable>
             </View>
           </View>
@@ -156,41 +158,57 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  mainWrapper: { flex: 1, flexDirection: "row", backgroundColor: "#F8FAFC" },
-  sidebar: { width: 260, backgroundColor: "#ffffff", borderRightWidth: 1, borderRightColor: "#E2E8F0", padding: 20, justifyContent: "space-between" },
-  topNav: { width: "100%", flexDirection: "row", alignItems: "center", padding: 8, borderBottomWidth: 1, borderBottomColor: "#E2E8F0" },
-  
-  logoSection: { flexDirection: "row", alignItems: "center", marginBottom: 30 },
-  logoText: { fontSize: 16, fontWeight: "700", color: "#1E293B", marginLeft: 10 },
+  mainWrapper: { flex: 1, flexDirection: "row", backgroundColor: "#FFFFFF" },
+  sidebar: { 
+    width: 240, 
+    backgroundColor: "#ffffff", 
+    borderRightWidth: 1, 
+    borderRightColor: "#F1F5F9", 
+    padding: 24, 
+    justifyContent: "space-between" 
+  },
+  topNav: { 
+    width: "100%", 
+    flexDirection: "row", 
+    alignItems: "center", 
+    padding: 12, 
+    borderBottomWidth: 1, 
+    borderBottomColor: "#F1F5F9" 
+  },
+  logoSection: { marginBottom: 40 },
+  logoText: { fontSize: 18, fontWeight: "900", color: "#0F172A", letterSpacing: -0.5 },
+  logoSub: { fontSize: 10, fontWeight: "700", color: "#94A3B8", letterSpacing: 2, marginTop: -2 },
   
   navGroup: { flex: 1 },
   navGroupMobile: { flexDirection: 'row', alignItems: 'center' },
-  
-  navItem: { flexDirection: "row", alignItems: "center", padding: 10, borderRadius: 10, marginBottom: 6 },
-  mobileNavItem: { paddingVertical: 6, paddingHorizontal: 10, marginRight: 5 },
-  
-  // Animation effect
-  inactiveLift: {
-    transform: [{ translateY: -8 }],
-    opacity: 0.5,
+  navItem: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    paddingVertical: 12, 
+    paddingHorizontal: 16, 
+    borderRadius: 8, 
+    marginBottom: 4 
   },
-
-  navLabel: { fontSize: 13, fontWeight: "600", color: "#64748B", marginLeft: 8 },
-  mobileNavLabel: { fontSize: 11, marginLeft: 5 }, // Mas maliit na font sa mobile
+  mobileNavItem: { paddingVertical: 8, paddingHorizontal: 12, marginRight: 8 },
+  navLabel: { fontSize: 11, fontWeight: "700", color: "#64748B", marginLeft: 12, letterSpacing: 0.5 },
+  mobileNavLabel: { fontSize: 10, marginLeft: 6 },
   
-  backNavButton: { backgroundColor: colors?.primary || "#4F46E5" },
   contentContainer: { flex: 1 },
-
-  // LOGOUT UI
-  logoutBtn: { flexDirection: "row", alignItems: "center", padding: 8, borderRadius: 10, borderWidth: 1, borderColor: "#FEE2E2", marginTop: 15 },
-  logoutBtnMobile: { marginTop: 0, marginLeft: 8, paddingVertical: 4, paddingHorizontal: 8 },
-  logoutIconContainer: { backgroundColor: "#fff", padding: 5, borderRadius: 6, justifyContent: "center", alignItems: "center", elevation: 1 },
-  logoutText: { color: "#dc2626", fontWeight: "700", fontSize: 13, marginLeft: 10 },
-
-  overlay: { backgroundColor: "rgba(15, 23, 42, 0.7)", justifyContent: "center", alignItems: "center", zIndex: 9999 },
-  confirmCard: { width: '80%', maxWidth: 300, backgroundColor: "#fff", padding: 20, borderRadius: 18, alignItems: "center" },
-  confirmTitle: { fontSize: 16, fontWeight: "bold", color: "#1E293B" },
-  confirmSub: { fontSize: 13, color: "#64748B", textAlign: "center", marginVertical: 12 },
-  confirmRow: { flexDirection: "row", gap: 8 },
-  confirmBtn: { paddingVertical: 8, paddingHorizontal: 15, borderRadius: 8, minWidth: 80, alignItems: "center" }
+  logoutBtn: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    padding: 12, 
+    borderRadius: 8, 
+    borderWidth: 1, 
+    borderColor: "#F1F5F9" 
+  },
+  logoutBtnMobile: { marginLeft: 'auto', paddingVertical: 8 },
+  logoutText: { color: "#dc2626", fontWeight: "800", fontSize: 11, marginLeft: 10, letterSpacing: 0.5 },
+  
+  overlay: { backgroundColor: "rgba(15, 23, 42, 0.4)", justifyContent: "center", alignItems: "center", zIndex: 9999 },
+  confirmCard: { width: 280, backgroundColor: "#fff", padding: 30, borderRadius: 4, alignItems: "center", borderWidth: 1, borderColor: '#E2E8F0' },
+  confirmTitle: { fontSize: 18, fontWeight: "900", color: "#0F172A", marginTop: 15 },
+  confirmSub: { fontSize: 13, color: "#64748B", textAlign: "center", marginVertical: 15, lineHeight: 20 },
+  confirmRow: { flexDirection: "column", gap: 10, width: '100%' },
+  confirmBtn: { paddingVertical: 12, borderRadius: 4, alignItems: "center", width: '100%' }
 });

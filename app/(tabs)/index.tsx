@@ -1,177 +1,219 @@
-import React, { useState, useCallback } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  ActivityIndicator, 
-  Pressable,
-  useWindowDimensions // Idinagdag para sa responsiveness
-} from "react-native";
 import { colors } from "@/constant/colors";
 import { supabase } from "@/constant/supabase";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View
+} from "react-native";
 
-export default function DashboardScreen() {
+export default function HomeScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const isMobile = width < 768; // Breakpoint para sa mobile
-
-  const [stats, setStats] = useState({
-    members: 0,
-    upcomingEvents: 0,
-    songLineups: 0,
-    totalPosts: 0
-  });
-  const [loading, setLoading] = useState(true);
+  const [memberCount, setMemberCount] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
-      fetchDashboardStats();
-
-      const subscription = supabase
-        .channel('dashboard-realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => fetchDashboardStats())
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => fetchDashboardStats())
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(subscription);
+      const fetchCount = async () => {
+        const { data } = await supabase.rpc('get_user_count');
+        setMemberCount(data || 0);
       };
+      fetchCount();
     }, [])
   );
 
-  const fetchDashboardStats = async () => {
-    setLoading(true);
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const { data: userCount } = await supabase.rpc('get_user_count');
-      const { count: eventCount } = await supabase.from('announcements').select('*', { count: 'exact', head: true }).eq('category', 'event').gte('target_date', today);
-      const { count: lineupCount } = await supabase.from('announcements').select('*', { count: 'exact', head: true }).eq('category', 'song-lineup').gte('target_date', today);
-      const { count: postCount } = await supabase.from('announcements').select('*', { count: 'exact', head: true });
-
-      setStats({
-        members: userCount || 0,
-        upcomingEvents: eventCount || 0,
-        songLineups: lineupCount || 0,
-        totalPosts: postCount || 0
-      });
-    } catch (error) {
-      console.error("Dashboard Fetch Error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, isMobile && { padding: 20 }]}>
-      {/* HEADER SECTION - Responsive direction */}
-      <View style={[styles.header, isMobile && { flexDirection: 'column', alignItems: 'flex-start', gap: 15 }]}>
-        <View>
-          <Text style={[styles.welcome, isMobile && { fontSize: 24 }]}>Church Dashboard</Text>
-          <Text style={styles.subtitle}>Overview of church activities and users.</Text>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <View style={styles.content}>
+        
+        {/* --- HERO SECTION --- */}
+        <View style={styles.heroSection}>
+          <Text style={styles.churchName}>WCAM CHURCH</Text>
+          <Text style={styles.heroHeadline}>
+            A community built on faith, hope, and unconditional love.
+          </Text>
+          <View style={styles.line} />
         </View>
-        <View style={styles.dateBadge}>
-          <Ionicons name="calendar-outline" size={16} color={colors.primary} />
-          <Text style={styles.dateText}>{new Date().toDateString()}</Text>
+
+        {/* --- MISSION SECTION --- */}
+        <View style={styles.section}>
+          <Text style={styles.label}>OUR MISSION</Text>
+          <Text style={styles.bodyText}>
+            To spread the gospel of Jesus Christ, making disciples of all nations, 
+            and empowering every believer to serve with a heart of compassion 
+            and excellence in every area of life.
+          </Text>
         </View>
+
+        {/* --- VISION SECTION --- */}
+        <View style={styles.section}>
+          <Text style={styles.label}>OUR VISION</Text>
+          <Text style={styles.bodyText}>
+            We envision a transformed generation united in spirit, 
+            growing in the knowledge of God, and becoming a light 
+            of hope to the broken and the lost.
+          </Text>
+        </View>
+
+        {/* --- GOALS SECTION --- */}
+        <View style={styles.section}>
+          <Text style={styles.label}>MINISTRY GOALS</Text>
+          
+          <View style={styles.goalItem}>
+            <Text style={styles.goalTitle}>Spiritual Maturity</Text>
+            <Text style={styles.goalDesc}>Nurturing every member through biblical teaching and prayerful living.</Text>
+          </View>
+
+          <View style={styles.goalItem}>
+            <Text style={styles.goalTitle}>Community Engagement</Text>
+            <Text style={styles.goalDesc}>Being a catalyst for positive change through local outreach and support programs.</Text>
+          </View>
+
+          <View style={styles.goalItem}>
+            <Text style={styles.goalTitle}>Holistic Development</Text>
+            <Text style={styles.goalDesc}>Supporting the growth of the mind, body, and spirit of our church family.</Text>
+          </View>
+        </View>
+
+        {/* --- STATS & ACTION --- */}
+        <View style={styles.footer}>
+          <Text style={styles.memberStat}>
+            {memberCount} SOULS IN THE MINISTRY
+          </Text>
+          
+          <Pressable onPress={() => router.push('/announcements')} style={styles.linkBtn}>
+            <Text style={styles.linkText}>VIEW LATEST UPDATES —</Text>
+          </Pressable>
+
+          <Pressable onPress={() => router.push('/members')} style={styles.linkBtn}>
+            <Text style={styles.linkText}>MEET THE MINISTRY TEAM —</Text>
+          </Pressable>
+        </View>
+
+        {/* --- VERSE --- */}
+        <View style={styles.verseSection}>
+          <Text style={styles.verseText}>
+            "Let everything that has breath praise the Lord."
+          </Text>
+          <Text style={styles.verseRef}>PSALM 150:6</Text>
+        </View>
+
       </View>
-
-      {loading ? (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loaderText}>Refreshing dashboard data...</Text>
-        </View>
-      ) : (
-        <View style={styles.grid}>
-          {/* STATS ROWS - Magiging column sa Mobile, row sa Desktop */}
-          <View style={[styles.statsRow, isMobile && { flexDirection: 'column' }]}>
-            <Pressable style={styles.card} onPress={() => router.push('/members')}>
-              <View style={[styles.iconBox, { backgroundColor: '#6366F120' }]}>
-                <Ionicons name="people" size={isMobile ? 24 : 28} color="#6366F1" />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardLabel}>WCAM Member</Text>
-                <Text style={[styles.cardCount, isMobile && { fontSize: 24 }]}>{stats.members}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
-            </Pressable>
-
-            <Pressable style={styles.card} onPress={() => router.push('/events')}>
-              <View style={[styles.iconBox, { backgroundColor: '#F59E0B20' }]}>
-                <Ionicons name="calendar" size={isMobile ? 24 : 28} color="#F59E0B" />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardLabel}>Upcoming Events</Text>
-                <Text style={[styles.cardCount, isMobile && { fontSize: 24 }]}>{stats.upcomingEvents}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
-            </Pressable>
-          </View>
-
-          <View style={[styles.statsRow, isMobile && { flexDirection: 'column' }]}>
-            <Pressable style={styles.card} onPress={() => router.push('/song-lineups')}>
-              <View style={[styles.iconBox, { backgroundColor: '#10B98120' }]}>
-                <Ionicons name="musical-notes" size={isMobile ? 24 : 28} color="#10B981" />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardLabel}>Active Lineups</Text>
-                <Text style={[styles.cardCount, isMobile && { fontSize: 24 }]}>{stats.songLineups}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
-            </Pressable>
-
-            <Pressable style={styles.card} onPress={() => router.push('/announcements')}>
-              <View style={[styles.iconBox, { backgroundColor: '#EC489920' }]}>
-                <Ionicons name="megaphone" size={isMobile ? 24 : 28} color="#EC4899" />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardLabel}>Total Posts</Text>
-                <Text style={[styles.cardCount, isMobile && { fontSize: 24 }]}>{stats.totalPosts}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
-            </Pressable>
-          </View>
-
-          {/* QUICK ACTIONS - Responsive Grid */}
-          <Text style={styles.sectionTitle}>Quick Management</Text>
-          <View style={[styles.actionGrid, isMobile && { flexDirection: 'column' }]}>
-            <Pressable style={styles.actionBtn} onPress={() => router.push('/announcements')}>
-              <Ionicons name="add-circle" size={22} color="#fff" />
-              <Text style={styles.actionBtnText}>New Announcement</Text>
-            </Pressable>
-            
-            <Pressable style={[styles.actionBtn, { backgroundColor: '#1E293B' }]} onPress={() => router.push('/song-lineups')}>
-              <Ionicons name="musical-note" size={22} color="#fff" />
-              <Text style={styles.actionBtnText}>Update Lineup</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
-  content: { padding: 40 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 40 },
-  welcome: { fontSize: 32, fontWeight: '900', color: '#0F172A' },
-  subtitle: { fontSize: 16, color: '#64748B', marginTop: 5 },
-  dateBadge: { backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', alignItems: 'center', gap: 8 },
-  dateText: { fontWeight: '700', color: colors.primary, fontSize: 14 },
-  grid: { gap: 20 },
-  statsRow: { flexDirection: 'row', gap: 20 },
-  card: { flex: 1, backgroundColor: '#fff', padding: 25, borderRadius: 24, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
-  iconBox: { width: 60, height: 60, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  cardContent: { flex: 1, marginLeft: 20 },
-  cardLabel: { fontSize: 11, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5 },
-  cardCount: { fontSize: 32, fontWeight: '900', color: '#0F172A' },
-  loaderContainer: { marginTop: 100, alignItems: 'center' },
-  loaderText: { marginTop: 10, color: '#64748B', fontWeight: '600' },
-  sectionTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A', marginTop: 30, marginBottom: 15 },
-  actionGrid: { flexDirection: 'row', gap: 20 },
-  actionBtn: { flex: 1, backgroundColor: colors.primary, paddingVertical: 20, borderRadius: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
-  actionBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 }
+  container: { 
+    flex: 1, 
+    backgroundColor: "#FFFFFF" 
+  },
+  content: { 
+    paddingHorizontal: 30, 
+    paddingVertical: 60 
+  },
+  
+  // HERO
+  heroSection: { 
+    marginBottom: 60 
+  },
+  churchName: { 
+    fontSize: 14, 
+    fontWeight: '800', 
+    color: colors.primary, 
+    letterSpacing: 4, 
+    marginBottom: 15 
+  },
+  heroHeadline: { 
+    fontSize: 32, 
+    fontWeight: '300', 
+    color: '#1A1A1A', 
+    lineHeight: 42 
+  },
+  line: { 
+    width: 40, 
+    height: 2, 
+    backgroundColor: '#000', 
+    marginTop: 30 
+  },
+
+  // SECTIONS
+  section: { 
+    marginBottom: 50 
+  },
+  label: { 
+    fontSize: 11, 
+    fontWeight: '900', 
+    color: '#A0A0A0', 
+    letterSpacing: 2, 
+    marginBottom: 15 
+  },
+  bodyText: { 
+    fontSize: 18, 
+    fontWeight: '400', 
+    color: '#333333', 
+    lineHeight: 28 
+  },
+
+  // GOALS
+  goalItem: { 
+    marginBottom: 25 
+  },
+  goalTitle: { 
+    fontSize: 16, 
+    fontWeight: '700', 
+    color: '#1A1A1A', 
+    marginBottom: 4 
+  },
+  goalDesc: { 
+    fontSize: 14, 
+    color: '#666666', 
+    lineHeight: 20 
+  },
+
+  // FOOTER / ACTIONS
+  footer: { 
+    marginTop: 40, 
+    paddingTop: 40, 
+    borderTopWidth: 1, 
+    borderTopColor: '#F0F0F0' 
+  },
+  memberStat: { 
+    fontSize: 12, 
+    fontWeight: '800', 
+    color: '#1A1A1A', 
+    marginBottom: 25, 
+    letterSpacing: 1 
+  },
+  linkBtn: { 
+    marginBottom: 15 
+  },
+  linkText: { 
+    fontSize: 13, 
+    fontWeight: '900', 
+    color: colors.primary 
+  },
+
+  // VERSE
+  verseSection: { 
+    marginTop: 60, 
+    alignItems: 'center' 
+  },
+  verseText: { 
+    fontSize: 15, 
+    color: '#999999', 
+    fontStyle: 'italic', 
+    textAlign: 'center' 
+  },
+  verseRef: { 
+    fontSize: 10, 
+    fontWeight: '900', 
+    color: '#CCCCCC', 
+    marginTop: 10, 
+    letterSpacing: 2 
+  }
 });

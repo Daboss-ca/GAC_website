@@ -2,12 +2,20 @@ import React, { useState, useCallback } from "react";
 import { 
   View, Text, StyleSheet, ScrollView, 
   Pressable, ActivityIndicator, Image, Modal,
-  useWindowDimensions // Idinagdag para sa responsiveness
+  useWindowDimensions 
 } from "react-native";
 import { colors } from "@/constant/colors";
 import { supabase } from "@/constant/supabase";
-import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
+
+// --- STEP 1: IMPORT LUCIDE ICONS ---
+import { 
+  Clock, 
+  MapPin, 
+  XCircle, 
+  Calendar as CalendarIcon, 
+  Image as ImageIcon 
+} from 'lucide-react-native';
 
 interface EventItem {
   id: string;
@@ -22,7 +30,7 @@ interface EventItem {
 
 export default function EventsScreen() {
   const { width } = useWindowDimensions();
-  const isMobile = width < 768; // Mobile breakpoint
+  const isMobile = width < 768;
 
   const [activeTab, setActiveTab] = useState<'upcoming' | 'memories'>('upcoming');
   const [upcomingEvents, setUpcomingEvents] = useState<EventItem[]>([]);
@@ -65,7 +73,7 @@ export default function EventsScreen() {
 
   return (
     <View style={[styles.container, isMobile && { padding: 15 }]}>
-      {/* HEADER SECTION - Responsive direction */}
+      {/* HEADER SECTION */}
       <View style={[styles.header, isMobile && { flexDirection: 'column', alignItems: 'flex-start', gap: 20 }]}>
         <View>
           <Text style={[styles.title, isMobile && { fontSize: 26 }]}>Church Events</Text>
@@ -107,11 +115,11 @@ export default function EventsScreen() {
                     
                     <View style={[styles.metaRow, isMobile && { flexWrap: 'wrap' }]}>
                       <View style={styles.metaItem}>
-                        <Ionicons name="time-outline" size={16} color={colors.primary} />
+                        <Clock size={16} color={colors.primary} />
                         <Text style={styles.metaText}>{item.target_time || "TBA"}</Text>
                       </View>
                       <View style={styles.metaItem}>
-                        <Ionicons name="location-outline" size={16} color="#64748B" />
+                        <MapPin size={16} color="#64748B" />
                         <Text style={styles.metaText}>{item.location || "Main Sanctuary"}</Text>
                       </View>
                     </View>
@@ -128,7 +136,10 @@ export default function EventsScreen() {
                   <Image source={{ uri: m.image_url || PLACEHOLDER_IMG }} style={styles.memoryImg} />
                   <View style={styles.memoryOverlay}>
                     <Text style={styles.memoryTitle}>{m.title}</Text>
-                    <Text style={styles.memoryDate}>{new Date(m.target_date).toLocaleDateString()}</Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5}}>
+                      <CalendarIcon size={12} color="#E2E8F0" />
+                      <Text style={styles.memoryDate}>{new Date(m.target_date).toLocaleDateString()}</Text>
+                    </View>
                   </View>
                 </Pressable>
               ))}
@@ -137,7 +148,7 @@ export default function EventsScreen() {
         </ScrollView>
       )}
 
-      {/* DETAILED MODAL - Responsive Width */}
+      {/* DETAILED MODAL */}
       <Modal visible={!!selectedMemory} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, isMobile && { width: '92%', borderRadius: 20 }]}>
@@ -145,15 +156,21 @@ export default function EventsScreen() {
               <ScrollView bounces={false}>
                 <Image source={{ uri: selectedMemory.image_url || PLACEHOLDER_IMG }} style={[styles.modalImg, isMobile && { height: 250 }]} />
                 <Pressable style={styles.closeIcon} onPress={() => setSelectedMemory(null)}>
-                  <Ionicons name="close-circle" size={35} color="#fff" />
+                  <XCircle size={35} color="#fff" fill="rgba(0,0,0,0.3)" />
                 </Pressable>
                 <View style={[styles.modalTextContent, isMobile && { padding: 20 }]}>
                   <View style={styles.modalBadge}><Text style={styles.modalBadgeText}>PAST EVENT</Text></View>
                   <Text style={[styles.modalTitle, isMobile && { fontSize: 22 }]}>{selectedMemory.title}</Text>
                   
                   <View style={[styles.modalMeta, isMobile && { flexDirection: 'column', gap: 5 }]}>
-                     <Text style={styles.modalMetaLabel}>DATE: <Text style={styles.modalMetaVal}>{new Date(selectedMemory.target_date).toLocaleDateString()}</Text></Text>
-                     <Text style={styles.modalMetaLabel}>TIME: <Text style={styles.modalMetaVal}>{selectedMemory.target_time || "---"}</Text></Text>
+                     <View style={styles.metaItem}>
+                        <CalendarIcon size={14} color="#94A3B8" />
+                        <Text style={styles.modalMetaLabel}>DATE: <Text style={styles.modalMetaVal}>{new Date(selectedMemory.target_date).toLocaleDateString()}</Text></Text>
+                     </View>
+                     <View style={styles.metaItem}>
+                        <Clock size={14} color="#94A3B8" />
+                        <Text style={styles.modalMetaLabel}>TIME: <Text style={styles.modalMetaVal}>{selectedMemory.target_time || "---"}</Text></Text>
+                     </View>
                   </View>
 
                   <Text style={styles.modalInfo}>{selectedMemory.description || "No description provided."}</Text>
@@ -197,7 +214,7 @@ const styles = StyleSheet.create({
   memoryImg: { width: '100%', height: '100%' },
   memoryOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 25, backgroundColor: 'rgba(0,0,0,0.6)' },
   memoryTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  memoryDate: { color: '#E2E8F0', fontSize: 12, marginTop: 5 },
+  memoryDate: { color: '#E2E8F0', fontSize: 12 },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: 600, backgroundColor: '#fff', borderRadius: 35, overflow: 'hidden', maxHeight: '90%' },
@@ -209,7 +226,7 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 28, fontWeight: '800', color: '#1E293B', marginBottom: 20 },
   modalMeta: { flexDirection: 'row', gap: 20, marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 15 },
   modalMetaLabel: { fontSize: 12, fontWeight: '700', color: '#94A3B8' },
-  modalMetaVal: { color: '#1E293B' },
+  modalMetaVal: { color: '#1E293B', fontWeight: '600' },
   modalInfo: { fontSize: 16, color: '#475569', lineHeight: 26 },
   emptyText: { color: '#94A3B8', fontSize: 16 }
 });
