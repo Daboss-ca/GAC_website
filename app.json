@@ -22,7 +22,8 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "output": "static"
+      "output": "static",
+      "baseUrl": "/GAC_website"
     },
     "plugins": [
       "expo-router",
