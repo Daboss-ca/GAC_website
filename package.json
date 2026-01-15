@@ -12,7 +12,7 @@
     "lint": "expo lint",
     "build:web": "npx expo export -p web",
     "predeploy": "npm run build:web",
-    "deploy": "npx expo export -p web --clear && touch dist/.nojekyll && cp CNAME dist/CNAME && npx gh-pages -d dist --dotfiles"
+    "deploy": "npx expo export --platform web --output-dir docs && git add docs/ && git commit -m 'update docs' && git push"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
