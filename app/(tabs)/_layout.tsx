@@ -24,7 +24,8 @@ import {
   Users,
   UserCircle,
   Menu,
-  X 
+  X,
+  Heart // Added for Life Group icon
 } from 'lucide-react-native';
 
 export default function TabLayout() {
@@ -38,6 +39,7 @@ export default function TabLayout() {
 
   const navItems = [
     { name: "Home", icon: LayoutGrid, path: "/(tabs)" },
+    { name: "Life Group", icon: Heart, path: "/(tabs)/lifegroup" }, // ADDED THIS
     { name: "Events", icon: Calendar, path: "/(tabs)/events" },
     { name: "Announcements", icon: Megaphone, path: "/(tabs)/announcements" },
     { name: "Song Lineups", icon: Music, path: "/(tabs)/song-lineups" },
@@ -64,7 +66,7 @@ export default function TabLayout() {
         <View style={styles.logoSection}>
           <View style={{ flex: 1, paddingRight: 10 }}>
              <Text style={styles.logoText} numberOfLines={2}>
-               GREAT AWAKENING CHURCH
+                GREAT AWAKENING CHURCH
              </Text>
              <Text style={styles.logoSub}>LOVE GOD & PEOPLE</Text>
           </View>
@@ -139,6 +141,7 @@ export default function TabLayout() {
         <View style={styles.contentArea}>
           <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: "none" } }}>
             <Tabs.Screen name="index" />
+            <Tabs.Screen name="lifegroup" /> {/* ADDED THIS */}
             <Tabs.Screen name="events" />
             <Tabs.Screen name="announcements" />
             <Tabs.Screen name="song-lineups" />
@@ -180,6 +183,7 @@ export default function TabLayout() {
   );
 }
 
+// ... styles remain unchanged ...
 const styles = StyleSheet.create({
   mainWrapper: { flex: 1, backgroundColor: "#FFFFFF" },
   layoutContainer: { flex: 1, flexDirection: 'row' },
@@ -196,10 +200,10 @@ const styles = StyleSheet.create({
     marginBottom: 40, 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
-    alignItems: 'flex-start', // Mahalaga para sa multi-line text
+    alignItems: 'flex-start', 
   },
   logoText: { 
-    fontSize: 14, // Fixed size para sa mobile responsiveness
+    fontSize: 14, 
     fontWeight: "900", 
     color: "#0F172A", 
     letterSpacing: 0.5,
@@ -214,10 +218,9 @@ const styles = StyleSheet.create({
   logoutBtn: { flexDirection: "row", alignItems: "center", padding: 15, borderRadius: 12, backgroundColor: "#FEF2F2" },
   logoutText: { color: "#dc2626", fontWeight: "800", fontSize: 11, marginLeft: 10 },
   
-  // Close Button positioning
   closeBtn: { 
     padding: 5,
-    marginTop: -5, // Pantay sa unang linya ng text
+    marginTop: -5,
   },
 
   drawerOverlay: { flex: 1, flexDirection: 'row' },

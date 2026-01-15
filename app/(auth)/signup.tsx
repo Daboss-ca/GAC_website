@@ -15,8 +15,9 @@ import {
 import { Stack, useRouter } from "expo-router";
 import { colors } from "@/constant/colors";
 import { supabase } from "@/constant/supabase";
-import { Ionicons } from "@expo/vector-icons";
 import * as Linking from 'expo-linking';
+// Ginamit ang Lucide Icons para consistent sa web at mobile
+import { Mail, Lock, User, Users, ChevronDown, Check, Eye, EyeOff, AlertCircle } from "lucide-react-native";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -38,7 +39,8 @@ export default function SignupScreen() {
     type: null,
   });
 
-  const ministries = ["Singer", "Musician", "Multimedia", "Backstage", "Ptr's"];
+  // Dinagdag ang Leaders sa listahan
+  const ministries = ["Singer", "Musician", "Multimedia", "Backstage", "Ptr's", "LifeGroup Leader", "Ministry Leader"];
 
   const toggleDropdown = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -53,7 +55,6 @@ export default function SignupScreen() {
   const handleSignup = async () => {
     setStatus({ message: "", type: null });
 
-    // Basic Validation
     if (!fullName || !email || !password || !confirmPassword || !ministry) {
       return setStatus({ message: "Please fill all fields", type: "error" });
     }
@@ -67,25 +68,20 @@ export default function SignupScreen() {
     try {
       const redirectTo = Linking.createURL("/(auth)/login");
 
-      // 1. SUPABASE AUTH SIGNUP
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password: password,
-        options: {
-          emailRedirectTo: redirectTo,
-        },
+        options: { emailRedirectTo: redirectTo },
       });
 
-      // Catching Auth Errors (Example: User already exists but not confirmed)
       if (authError) {
         if (authError.message.includes("already registered")) {
-          throw new Error("This email is already registered. Please login instead.");
+          throw new Error("Email already registered. Please login instead.");
         }
         throw authError;
       }
 
       if (authData.user) {
-        // 2. INSERT TO PUBLIC USERS TABLE
         const { error: dbError } = await supabase.from("users").insert([
           { 
             id: authData.user.id, 
@@ -95,38 +91,18 @@ export default function SignupScreen() {
           }
         ]);
 
-        if (dbError) {
-          // HANDLE 409 CONFLICT (Duplicate Key/Email)
-          if (dbError.code === "23505") { 
-            throw new Error("Email already exists in our records.");
-          }
-          throw dbError;
-        }
+        if (dbError) throw dbError;
         
         setStatus({ 
-          message: "Account created! Please check your email to confirm your signup.", 
+          message: "Account created! Check your email to confirm.", 
           type: "success" 
         });
 
-        // Optional: Clear fields on success
-        setFullName("");
-        setEmail("");
-        setPassword("");
-        setConfirmPassword("");
-        setMinistry("");
+        // Reset fields
+        setFullName(""); setEmail(""); setPassword(""); setConfirmPassword(""); setMinistry("");
       }
     } catch (error: any) {
-      // Map technical errors to user-friendly messages
-      let friendlyMessage = error.message;
-      
-      if (error.message.includes("network") || error.status === 0) {
-        friendlyMessage = "Connection error. Please check your internet.";
-      }
-
-      setStatus({ 
-        message: friendlyMessage, 
-        type: "error" 
-      });
+      setStatus({ message: error.message, type: "error" });
     } finally {
       setLoading(false);
     }
@@ -144,69 +120,74 @@ export default function SignupScreen() {
           <Text style={styles.title}>Create Account</Text>
           <Text style={styles.subtitle}>Join Great Awakening Church</Text>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Full Name"
-            placeholderTextColor="#94a3b8"
-            value={fullName}
-            onChangeText={setFullName}
-          />
-
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="#94a3b8"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-
-          <View style={styles.passwordContainer}>
+          {/* Full Name Input */}
+          <View style={styles.inputContainer}>
+            <User size={18} color="#94a3b8" style={styles.leftIcon} />
             <TextInput
-              style={[styles.input, { flex: 1, marginBottom: 0, borderWidth: 0 }]}
+              style={styles.inputWithIcon}
+              placeholder="Full Name"
+              placeholderTextColor="#94a3b8"
+              value={fullName}
+              onChangeText={setFullName}
+            />
+          </View>
+
+          {/* Email Input */}
+          <View style={styles.inputContainer}>
+            <Mail size={18} color="#94a3b8" style={styles.leftIcon} />
+            <TextInput
+              style={styles.inputWithIcon}
+              placeholder="Email"
+              placeholderTextColor="#94a3b8"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </View>
+
+          {/* Password Input */}
+          <View style={styles.inputContainer}>
+            <Lock size={18} color="#94a3b8" style={styles.leftIcon} />
+            <TextInput
+              style={styles.inputWithIcon}
               placeholder="Password"
               placeholderTextColor="#94a3b8"
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
             />
-            <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-              <Ionicons 
-                name={showPassword ? "eye-outline" : "eye-off-outline"} 
-                size={20} 
-                color="#64748B" 
-              />
+            <Pressable onPress={() => setShowPassword(!showPassword)}>
+              {showPassword ? <EyeOff size={18} color="#64748B" /> : <Eye size={18} color="#64748B" />}
             </Pressable>
           </View>
 
-          <View style={styles.passwordContainer}>
+          {/* Confirm Password */}
+          <View style={styles.inputContainer}>
+            <Lock size={18} color="#94a3b8" style={styles.leftIcon} />
             <TextInput
-              style={[styles.input, { flex: 1, marginBottom: 0, borderWidth: 0 }]}
+              style={styles.inputWithIcon}
               placeholder="Confirm Password"
               placeholderTextColor="#94a3b8"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry={!showPassword}
             />
-            <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-              <Ionicons 
-                name={showPassword ? "eye-outline" : "eye-off-outline"} 
-                size={20} 
-                color="#64748B" 
-              />
-            </Pressable>
           </View>
 
+          {/* Ministry Dropdown */}
           <Pressable style={styles.dropdownHeader} onPress={toggleDropdown}>
-            <Text style={ministry ? styles.dropdownTextSelected : styles.dropdownPlaceholder}>
-              {ministry || "Select Ministry"}
-            </Text>
-            <Ionicons name={dropdownOpen ? "chevron-up" : "chevron-down"} size={18} color="#64748B" />
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Users size={18} color="#94a3b8" style={{ marginRight: 10 }} />
+              <Text style={ministry ? styles.dropdownTextSelected : styles.dropdownPlaceholder}>
+                {ministry || "Select Ministry / Role"}
+              </Text>
+            </View>
+            <ChevronDown size={18} color="#64748B" />
           </Pressable>
 
           {dropdownOpen && (
-            <View style={styles.dropdownContainer}>
+            <View style={styles.dropdownWrapper}>
               <ScrollView style={styles.scrollDropdown} nestedScrollEnabled>
                 {ministries.map((m) => (
                   <Pressable
@@ -214,9 +195,8 @@ export default function SignupScreen() {
                     style={[styles.dropdownItem, ministry === m && styles.dropdownItemSelected]}
                     onPress={() => selectMinistry(m)}
                   >
-                    <Text style={[styles.dropdownText, ministry === m && { color: "#fff" }]}>
-                      {m}
-                    </Text>
+                    <Text style={[styles.dropdownText, ministry === m && { color: "#fff" }]}>{m}</Text>
+                    {ministry === m && <Check size={14} color="#fff" />}
                   </Pressable>
                 ))}
               </ScrollView>
@@ -224,44 +204,24 @@ export default function SignupScreen() {
           )}
 
           <Pressable
-            style={({ pressed }) => [
-              styles.button, 
-              (loading || pressed) && { opacity: 0.8 }
-            ]}
+            style={({ pressed }) => [styles.button, (loading || pressed) && { opacity: 0.8 }]}
             onPress={handleSignup}
             disabled={loading}
           >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Sign Up</Text>
-            )}
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign Up</Text>}
           </Pressable>
 
-          {status.message ? (
-            <View style={[
-                styles.statusContainer, 
-                status.type === "error" ? styles.errorBg : styles.successBg
-            ]}>
-              <Ionicons 
-                name={status.type === "error" ? "alert-circle" : "checkmark-circle"} 
-                size={18} 
-                color={status.type === "error" ? "#dc2626" : "#16a34a"} 
-                style={{marginRight: 8}}
-              />
-              <Text style={[
-                styles.statusText, 
-                status.type === "error" ? styles.errorText : styles.successText
-              ]}>
+          {status.message && (
+            <View style={[styles.statusBox, status.type === "error" ? styles.errorBg : styles.successBg]}>
+              {status.type === "error" ? <AlertCircle size={18} color="#dc2626" /> : <Check size={18} color="#16a34a" />}
+              <Text style={[styles.statusText, status.type === "error" ? styles.errorText : styles.successText]}>
                 {status.message}
               </Text>
             </View>
-          ) : null}
+          )}
 
           <Pressable onPress={() => router.push("/(auth)/login")} style={{ marginTop: 20 }}>
-            <Text style={styles.loginText}>
-              Already have an account? <Text style={styles.loginLink}>Login</Text>
-            </Text>
+            <Text style={styles.loginText}>Already have an account? <Text style={styles.loginLink}>Login</Text></Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -271,36 +231,29 @@ export default function SignupScreen() {
 
 const styles = StyleSheet.create({
   screen: { flexGrow: 1, justifyContent: "center", alignItems: "center", padding: 16, backgroundColor: "#f8f9fa" },
-  card: { width: "100%", maxWidth: 400, padding: 24, borderRadius: 24, backgroundColor: "#fff", elevation: 4, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 10, shadowOffset: {width: 0, height: 4} },
+  card: { width: "100%", maxWidth: 400, padding: 24, borderRadius: 24, backgroundColor: "#fff", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 10, elevation: 4 },
   title: { fontSize: 24, fontWeight: "800", color: "#1E293B", textAlign: "center" },
   subtitle: { fontSize: 14, color: "#64748B", marginBottom: 24, textAlign: "center" },
-  input: { backgroundColor: "#f8fafc", padding: 12, borderRadius: 12, fontSize: 15, marginBottom: 14, borderWidth: 1, borderColor: "#e2e8f0", color: "#1e293b" },
   
-  passwordContainer: { 
-    flexDirection: "row", 
-    alignItems: "center", 
-    backgroundColor: "#f8fafc", 
-    borderRadius: 12, 
-    borderWidth: 1, 
-    borderColor: "#e2e8f0", 
-    marginBottom: 14,
-    paddingRight: 12 
-  },
-  eyeIcon: { padding: 4 },
+  // Icon Inputs
+  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: "#f8fafc", borderRadius: 12, borderWidth: 1, borderColor: "#e2e8f0", marginBottom: 14, paddingHorizontal: 12 },
+  leftIcon: { marginRight: 10 },
+  inputWithIcon: { flex: 1, paddingVertical: 12, fontSize: 15, color: "#1e293b", ...Platform.select({ web: { outlineStyle: 'none' } }) } as any,
 
+  // Dropdown
   dropdownHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: "#e2e8f0", backgroundColor: "#f8fafc", marginBottom: 8 },
   dropdownPlaceholder: { color: "#94a3b8", fontSize: 15 },
   dropdownTextSelected: { color: "#1e293b", fontSize: 15 },
-  dropdownContainer: { maxHeight: 150, marginBottom: 16, borderRadius: 12, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e2e8f0", overflow: 'hidden' },
+  dropdownWrapper: { maxHeight: 150, marginBottom: 16, borderRadius: 12, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e2e8f0", overflow: 'hidden' },
   scrollDropdown: { padding: 4 },
-  dropdownItem: { padding: 10, borderRadius: 8, marginBottom: 2 },
+  dropdownItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, borderRadius: 8, marginBottom: 2 },
   dropdownItemSelected: { backgroundColor: colors.primary },
-  dropdownText: { color: "#475569", fontSize: 14 },
+  dropdownText: { color: "#475569", fontSize: 14, fontWeight: "600" },
 
-  button: { backgroundColor: colors.primary, padding: 16, borderRadius: 14, alignItems: "center", marginTop: 10, shadowColor: colors.primary, shadowOpacity: 0.3, shadowRadius: 5, shadowOffset: {width: 0, height: 4} },
+  button: { backgroundColor: colors.primary, padding: 16, borderRadius: 14, alignItems: "center", marginTop: 10 },
   buttonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
 
-  statusContainer: { marginTop: 16, padding: 12, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center' },
+  statusBox: { marginTop: 16, padding: 12, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   statusText: { fontSize: 13, flex: 1, fontWeight: "600" },
   errorBg: { backgroundColor: "#fef2f2", borderColor: "#fee2e2" },
   errorText: { color: "#dc2626" },

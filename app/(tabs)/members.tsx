@@ -1,29 +1,32 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Image, Platform, Modal, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Image, Platform, Modal, Alert, useWindowDimensions } from "react-native";
 import { supabase } from "@/constant/supabase"; 
 import { colors } from "@/constant/colors"; 
 import { useFocusEffect, useRouter } from "expo-router"; 
-import { X, Mail, Phone, Calendar, MapPin, Trash2, Check, RotateCcw } from "lucide-react-native";
+import { X, Mail, Phone, Trash2, Check, RotateCcw, ChevronDown } from "lucide-react-native";
 
 const INSTRUMENTS = ["Worship Leader", "Keyboardist", "Lead Guitarist", "Acoustic Guitarist", "Bassist", "Drummer", "Vocalist"];
 
 export default function WorshipTeamScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
+  const statusWidth = isMobile ? 65 : 120;
+  const actionWidth = isMobile ? 85 : 140;
+
   const [dutyList, setDutyList] = useState<any[]>([]);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [registeredUsers, setRegisteredUsers] = useState<any[]>([]);
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
-  // States para sa Inline Deletion at Loading
+  // Realtime & Delete States
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [isProcessingId, setIsProcessingId] = useState<string | null>(null);
-
-  // States para sa Profile Modal
   const [selectedUserProfile, setSelectedUserProfile] = useState<any>(null);
   const [isProfileModalVisible, setIsProfileModalVisible] = useState(false);
 
-  // States para sa Lineup Form
+  // Form State
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedName, setSelectedName] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
@@ -32,29 +35,26 @@ export default function WorshipTeamScreen() {
   const [isRoleOpen, setIsRoleOpen] = useState(false);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
-  // ADMIN ACCESS LOGIC
   const isPtrs = currentUserProfile?.ministry === "Ptr's";
   const isSpecificAdmin = currentUserProfile?.email === "charlenemaearnuco@gmail.com" || currentUserProfile?.email === "chris.arnuco12@gmail.com";
   const canManageLineup = isPtrs || isSpecificAdmin;
 
   const getToday = () => new Date().toISOString().split('T')[0];
 
+  // REALTIME LOGIC - Sinisiguro nitong laging updated ang listahan
   const refreshEverything = useCallback(async () => {
     await fetchUserData(); 
     await fetchDatesFromAnnouncements();
     await fetchDutyList();
-  }, [selectedDate]);
+  }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      refreshEverything();
-    }, [refreshEverything])
-  );
+  useFocusEffect(useCallback(() => { refreshEverything(); }, [refreshEverything]));
 
   useEffect(() => {
     const dutyChannel = supabase.channel('rt-duty')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'duty_roster' }, () => {
-        refreshEverything(); 
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'duty_roster' }, (payload) => {
+        console.log("Change received!", payload);
+        fetchDutyList(); // Re-fetch kapag may nagbago sa database
       })
       .subscribe();
     return () => { supabase.removeChannel(dutyChannel); };
@@ -82,132 +82,100 @@ export default function WorshipTeamScreen() {
       if (profile) setCurrentUserProfile(profile);
     }
     const { data: users } = await supabase.from('users').select('*');
-    if (users) {
-      const updatedUsers = users.map(u => ({
-        ...u,
-        avatar_url: u.avatar_url ? `${u.avatar_url}?t=${new Date().getTime()}` : null
-      }));
-      setRegisteredUsers(updatedUsers);
-    }
+    if (users) setRegisteredUsers(users);
     setLoading(false);
-  };
-
-  const handleMemberClick = (fullName: string) => {
-    if (fullName === currentUserProfile?.full_name) {
-      router.push("/profile");
-    } else {
-      const user = registeredUsers.find(u => u.full_name === fullName);
-      if (user) {
-        setSelectedUserProfile(user);
-        setIsProfileModalVisible(true);
-      }
-    }
   };
 
   const addToDuty = async () => {
     if (!canManageLineup) return Alert.alert("Access Denied", "Admin only.");
     if (!selectedName || !selectedRole || !selectedDate) return Alert.alert("Required", "Please fill all fields.");
     const { error } = await supabase.from('duty_roster').insert([{ 
-      full_name: selectedName, 
-      role: selectedRole, 
-      availability: 'Pending', 
-      service_date: selectedDate 
+      full_name: selectedName, role: selectedRole, availability: 'Pending', service_date: selectedDate 
     }]);
     if (!error) { 
-      setSelectedName(""); setSelectedRole(""); setIsNameOpen(false); setIsRoleOpen(false);
-      refreshEverything(); 
+      setSelectedName(""); setSelectedRole(""); 
+      // fetchDutyList() is handled by realtime subscription
     }
   };
 
   const updateStatus = async (id: string, newStatus: string) => {
     const { error } = await supabase.from('duty_roster').update({ availability: newStatus }).eq('id', id);
-    if (!error) { setOpenDropdownId(null); fetchDutyList(); }
+    if (!error) { setOpenDropdownId(null); }
   };
 
-  // EXECUTE DELETE WITH SKELETON
+  // DELETE WITH CONFIRMATION
   const executeDelete = async (id: string) => {
-    setIsProcessingId(id); // Simulan ang Skeleton Loading
     const { error } = await supabase.from('duty_roster').delete().eq('id', id);
-    
-    if (!error) {
-        setTimeout(() => { // Konting delay para sa visual effect
-            setDeletingId(null);
-            setIsProcessingId(null);
-            refreshEverything();
-        }, 600);
-    } else {
-        setIsProcessingId(null);
-        Alert.alert("Error", "Could not delete entry.");
-    }
+    if (!error) { setDeletingId(null); }
   };
 
   if (loading) return <View style={{flex:1, justifyContent:'center'}}><ActivityIndicator size="large" color={colors.primary} /></View>;
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.content, !isMobile && { maxWidth: 1100, alignSelf: 'center', width: '100%' }]} keyboardShouldPersistTaps="handled">
         <Text style={styles.titleText}>Worship Team Registry</Text>
 
+        {/* --- ADD TO LINEUP FORM --- */}
         {canManageLineup && (
           <View style={[styles.schedulingBox, { zIndex: 10000 }]}>
             <Text style={styles.boxTitle}>ADD TO LINEUP (ADMIN ACCESS)</Text>
-            <View style={styles.formRow}>
-              {/* DATE DROPDOWN */}
-              <View style={[styles.dropdownWrapper, { zIndex: isDateOpen ? 1000 : 1 }]}>
+            <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
+              {/* DATE PICKER */}
+              <View style={styles.inputWrapper}>
                 <Pressable style={styles.formDropdown} onPress={() => {setIsDateOpen(!isDateOpen); setIsNameOpen(false); setIsRoleOpen(false);}}>
-                  <Text style={styles.selectedText}>{selectedDate || "Date"}</Text>
+                  <Text style={styles.selectedText} numberOfLines={1}>{selectedDate || "Select Date"}</Text>
+                  <ChevronDown size={14} color="#64748B" />
                 </Pressable>
                 {isDateOpen && (
                   <View style={styles.floatingMenu}>
                     {availableDates.map(d => (
-                      <Pressable key={d} style={styles.menuItem} onPress={() => { setSelectedDate(d); setIsDateOpen(false); }}>
-                        <Text style={styles.menuItemText}>{d}</Text>
-                      </Pressable>
+                      <Pressable key={d} style={styles.menuItem} onPress={() => { setSelectedDate(d); setIsDateOpen(false); }}><Text style={styles.menuItemText}>{d}</Text></Pressable>
                     ))}
                   </View>
                 )}
               </View>
 
-              {/* MEMBER DROPDOWN */}
-              <View style={[styles.dropdownWrapper, { zIndex: isNameOpen ? 1000 : 1 }]}>
+              {/* MEMBER PICKER */}
+              <View style={styles.inputWrapper}>
                 <Pressable style={styles.formDropdown} onPress={() => {setIsNameOpen(!isNameOpen); setIsDateOpen(false); setIsRoleOpen(false);}}>
-                  <Text style={styles.selectedText}>{selectedName || "Member"}</Text>
+                  <Text style={styles.selectedText} numberOfLines={1}>{selectedName || "Select Member"}</Text>
+                  <ChevronDown size={14} color="#64748B" />
                 </Pressable>
                 {isNameOpen && (
                   <View style={styles.floatingMenu}>
-                    <ScrollView style={{maxHeight: 150}} nestedScrollEnabled>
+                    <ScrollView style={{maxHeight: 200}} nestedScrollEnabled>
                       {registeredUsers.map((u, i) => (
-                        <Pressable key={i} style={styles.menuItem} onPress={() => { setSelectedName(u.full_name); setIsNameOpen(false); }}>
-                          <Text style={styles.menuItemText}>{u.full_name}</Text>
-                        </Pressable>
+                        <Pressable key={i} style={styles.menuItem} onPress={() => { setSelectedName(u.full_name); setIsNameOpen(false); }}><Text style={styles.menuItemText}>{u.full_name}</Text></Pressable>
                       ))}
                     </ScrollView>
                   </View>
                 )}
               </View>
 
-              {/* ROLE DROPDOWN */}
-              <View style={[styles.dropdownWrapper, { zIndex: isRoleOpen ? 1000 : 1 }]}>
+              {/* ROLE PICKER */}
+              <View style={styles.inputWrapper}>
                 <Pressable style={styles.formDropdown} onPress={() => {setIsRoleOpen(!isRoleOpen); setIsDateOpen(false); setIsNameOpen(false);}}>
-                  <Text style={styles.selectedText}>{selectedRole || "Role"}</Text>
+                  <Text style={styles.selectedText} numberOfLines={1}>{selectedRole || "Select Role"}</Text>
+                  <ChevronDown size={14} color="#64748B" />
                 </Pressable>
                 {isRoleOpen && (
                   <View style={styles.floatingMenu}>
                     {INSTRUMENTS.map(role => (
-                      <Pressable key={role} style={styles.menuItem} onPress={() => { setSelectedRole(role); setIsRoleOpen(false); }}>
-                        <Text style={styles.menuItemText}>{role}</Text>
-                      </Pressable>
+                      <Pressable key={role} style={styles.menuItem} onPress={() => { setSelectedRole(role); setIsRoleOpen(false); }}><Text style={styles.menuItemText}>{role}</Text></Pressable>
                     ))}
                   </View>
                 )}
               </View>
-              <Pressable style={[styles.addBtn, {backgroundColor: colors.primary}]} onPress={addToDuty}>
-                <Text style={styles.addBtnText}>ADD</Text>
+
+              <Pressable style={[styles.addBtn, {backgroundColor: colors.primary}, isMobile && { height: 45 }]} onPress={addToDuty}>
+                <Text style={styles.addBtnText}>ADD TO LINEUP</Text>
               </Pressable>
             </View>
           </View>
         )}
 
+        {/* --- TEAM LIST TABLE --- */}
         {availableDates.map((date) => {
           const members = dutyList.filter(d => d.service_date === date);
           if (members.length === 0) return null; 
@@ -216,109 +184,68 @@ export default function WorshipTeamScreen() {
               <View style={styles.dateHeaderLabel}><Text style={styles.dateHeaderText}>{date}</Text></View>
               <View style={styles.tableCard}>
                 <View style={styles.tableHeader}>
-                  <Text style={[styles.th, { flex: 3 }]}>TEAM MEMBER</Text>
-                  <Text style={[styles.th, { flex: 2, textAlign: 'center' }]}>STATUS</Text>
-                  <Text style={[styles.th, { flex: 1.8, textAlign: 'right' }]}>ACTION</Text>
+                  <Text style={styles.thName}>MEMBER</Text>
+                  <Text style={[styles.thStatus, { width: statusWidth }]}>STATUS</Text>
+                  <Text style={[styles.thAction, { width: actionWidth }]}>ACTION</Text>
                 </View>
+
                 {members.map((item) => {
                     const isOpen = openDropdownId === item.id;
                     const isConfirmingDelete = deletingId === item.id;
-                    const isBeingDeleted = isProcessingId === item.id;
                     const userMatch = registeredUsers.find(u => u.full_name === item.full_name);
                     const avatarUri = userMatch?.avatar_url;
 
-                    // SKELETON UI STATE
-                    if (isBeingDeleted) {
-                        return (
-                            <View key={item.id} style={[styles.tableRow, styles.skeletonRow]}>
-                                <View style={{flex: 3, flexDirection: 'row', alignItems: 'center'}}>
-                                    <View style={styles.skeletonAvatar} />
-                                    <View style={{marginLeft: 10, flex: 1}}>
-                                        <View style={styles.skeletonTextLong} />
-                                        <View style={styles.skeletonTextShort} />
-                                    </View>
-                                </View>
-                                <View style={{flex: 2, alignItems: 'center'}}><View style={styles.skeletonBadge} /></View>
-                                <View style={{flex: 1.8, alignItems: 'flex-end'}}><ActivityIndicator size="small" color="#DC2626" /></View>
-                            </View>
-                        );
-                    }
-
                     return (
-                      <View key={item.id} style={[
-                        styles.tableRow, 
-                        isOpen && { zIndex: 100 },
-                        isConfirmingDelete && { backgroundColor: '#FFF1F2' }
-                      ]}>
-                        
-                        <Pressable 
-                          style={{flex: 3, flexDirection: 'row', alignItems: 'center'}}
-                          onPress={() => handleMemberClick(item.full_name)}
-                        >
-                          <View style={styles.avatarMiniFrame}>
-                            {avatarUri ? (
-                              <Image source={{ uri: avatarUri }} style={styles.avatarMiniImage} resizeMode="cover" />
-                            ) : (
-                              <View style={styles.avatarInitialBox}>
-                                <Text style={styles.avatarInitialText}>{item.full_name ? item.full_name[0] : '?'}</Text>
-                              </View>
-                            )}
+                      <View key={item.id} style={[styles.tableRow, isOpen && { zIndex: 999 }, isConfirmingDelete && {backgroundColor: '#FFF1F2'}]}>
+                        {/* Name Col */}
+                        <Pressable style={styles.nameCol} onPress={() => {
+                            const user = registeredUsers.find(u => u.full_name === item.full_name);
+                            if(user) { setSelectedUserProfile(user); setIsProfileModalVisible(true); }
+                        }}>
+                          <View style={[styles.avatarWrapper, isMobile && { width: 28, height: 28 }]}>
+                            {avatarUri ? <Image source={{ uri: avatarUri }} style={styles.avatarMiniImage} /> : <View style={styles.avatarInitialBox}><Text style={styles.avatarInitialText}>{item.full_name[0]}</Text></View>}
                           </View>
-                          <View style={{marginLeft: 10, flex: 1}}>
-                            <Text style={styles.memberName} numberOfLines={1}>{item.full_name}</Text>
-                            <Text style={styles.roleSubtext}>{item.role}</Text>
+                          <View style={styles.nameTextWrapper}>
+                            <Text style={[styles.memberName, { fontSize: isMobile ? 10 : 14 }]} numberOfLines={1}>{item.full_name}</Text>
+                            <Text style={[styles.roleSubtext, { fontSize: isMobile ? 8 : 11 }]} numberOfLines={1}>{item.role}</Text>
                           </View>
                         </Pressable>
 
-                        <View style={{flex: 2, alignItems: 'center'}}>
-                          {isConfirmingDelete ? (
-                            <Text style={styles.confirmDeleteText}>REMOVE?</Text>
-                          ) : (
-                            <Text style={[styles.statusLabel, { color: item.availability === 'Available' ? '#16A34A' : item.availability === 'Unavailable' ? '#DC2626' : '#94A3B8' }]}>
-                              {item.availability.toUpperCase()}
-                            </Text>
-                          )}
+                        {/* Status Col */}
+                        <View style={[styles.statusCol, { width: statusWidth }]}>
+                          <Text style={[styles.statusLabel, { color: item.availability === 'Available' ? '#16A34A' : item.availability === 'Unavailable' ? '#DC2626' : '#94A3B8', fontSize: isMobile ? 8 : 12 }]}>
+                            {item.availability.toUpperCase()}
+                          </Text>
                         </View>
 
-                        <View style={{flex: 1.8, flexDirection: 'row', justifyContent: 'flex-end', gap: 6}}>
+                        {/* Action Col with Confirmation */}
+                        <View style={[styles.actionCol, { width: actionWidth }]}>
                           {isConfirmingDelete ? (
-                            <View style={{flexDirection: 'row', gap: 6}}>
-                                <Pressable onPress={() => executeDelete(item.id)} style={styles.confirmBtn}>
-                                    <Check size={14} color="#FFF" />
-                                </Pressable>
-                                <Pressable onPress={() => setDeletingId(null)} style={styles.cancelBtn}>
-                                    <RotateCcw size={14} color="#475569" />
-                                </Pressable>
+                            <View style={styles.actionGroup}>
+                              <Pressable onPress={() => executeDelete(item.id)} style={[styles.confirmBtn, {backgroundColor: '#16A34A'}]}><Check size={12} color="#FFF" /></Pressable>
+                              <Pressable onPress={() => setDeletingId(null)} style={[styles.confirmBtn, {backgroundColor: '#94A3B8'}]}><RotateCcw size={12} color="#FFF" /></Pressable>
                             </View>
                           ) : (
-                            <>
-                                {item.full_name === currentUserProfile?.full_name && (
-                                    <View>
-                                        <Pressable onPress={() => setOpenDropdownId(isOpen ? null : item.id)} style={styles.editBtn}>
-                                            <Text style={styles.editBtnText}>{isOpen ? "X" : "EDIT"}</Text>
-                                        </Pressable>
-                                        {isOpen && (
-                                            <View style={styles.tableFloatingMenu}>
-                                                <Pressable style={styles.menuItem} onPress={() => updateStatus(item.id, 'Available')}>
-                                                    <Text style={[styles.menuItemText, {color: '#16A34A'}]}>AVAILABLE</Text>
-                                                </Pressable>
-                                                <Pressable style={styles.menuItem} onPress={() => updateStatus(item.id, 'Unavailable')}>
-                                                    <Text style={[styles.menuItemText, {color: '#DC2626'}]}>UNAVAILABLE</Text>
-                                                </Pressable>
-                                            </View>
-                                        )}
-                                    </View>
-                                )}
-
-                                {canManageLineup && (
-                                    <Pressable 
-                                        onPress={() => { setDeletingId(item.id); setOpenDropdownId(null); }} 
-                                        style={[styles.editBtn, {borderColor: '#FEE2E2', backgroundColor: '#FEF2F2'}]}
-                                    >
-                                        <Trash2 size={12} color="#DC2626" />
-                                    </Pressable>
-                                )}
-                            </>
+                            <View style={styles.actionGroup}>
+                              {item.full_name === currentUserProfile?.full_name && (
+                                  <View>
+                                      <Pressable onPress={() => setOpenDropdownId(isOpen ? null : item.id)} style={styles.editBtn}>
+                                          <Text style={[styles.editBtnText, { fontSize: isMobile ? 8 : 11 }]}>{isOpen ? "X" : "EDIT"}</Text>
+                                      </Pressable>
+                                      {isOpen && (
+                                          <View style={styles.tableFloatingMenu}>
+                                              <Pressable style={styles.menuItem} onPress={() => updateStatus(item.id, 'Available')}><Text style={styles.menuItemText}>AVAILABLE</Text></Pressable>
+                                              <Pressable style={styles.menuItem} onPress={() => updateStatus(item.id, 'Unavailable')}><Text style={styles.menuItemText}>UNAVAILABLE</Text></Pressable>
+                                          </View>
+                                      )}
+                                  </View>
+                              )}
+                              {canManageLineup && (
+                                  <Pressable onPress={() => setDeletingId(item.id)} style={styles.deleteBtn}>
+                                      <Trash2 size={isMobile ? 12 : 16} color="#DC2626" />
+                                  </Pressable>
+                              )}
+                            </View>
                           )}
                         </View>
                       </View>
@@ -329,105 +256,50 @@ export default function WorshipTeamScreen() {
           );
         })}
       </ScrollView>
-
-      {/* --- PROFILE INFORMATION MODAL --- */}
-      <Modal animationType="fade" transparent={true} visible={isProfileModalVisible} onRequestClose={() => setIsProfileModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Member Information</Text>
-              <Pressable onPress={() => setIsProfileModalVisible(false)}><X size={20} color="#64748B" /></Pressable>
-            </View>
-            <View style={styles.modalProfileContent}>
-              <View style={styles.modalAvatarCircle}>
-                 {selectedUserProfile?.avatar_url ? (
-                   <Image source={{ uri: selectedUserProfile.avatar_url }} style={styles.modalAvatarImg} resizeMode="cover" />
-                 ) : ( <Text style={styles.modalAvatarInitial}>{selectedUserProfile?.full_name?.charAt(0)}</Text> )}
-              </View>
-              <Text style={styles.modalName}>{selectedUserProfile?.full_name}</Text>
-              <View style={styles.modalBadge}><Text style={styles.modalBadgeText}>{selectedUserProfile?.ministry?.toUpperCase()}</Text></View>
-            </View>
-            <View style={styles.modalInfoList}>
-              <InfoRow icon={<Mail size={14} color={colors.primary} />} label="EMAIL" value={selectedUserProfile?.email} />
-              <InfoRow icon={<Phone size={14} color={colors.primary} />} label="PHONE" value={selectedUserProfile?.phone || "N/A"} />
-              <InfoRow icon={<Calendar size={14} color={colors.primary} />} label="BIRTHDAY" value={selectedUserProfile?.birth_date || "N/A"} />
-              <InfoRow icon={<MapPin size={14} color={colors.primary} />} label="ADDRESS" value={selectedUserProfile?.address || "N/A"} />
-            </View>
-            <Pressable style={styles.closeBtn} onPress={() => setIsProfileModalVisible(false)}><Text style={styles.closeBtnText}>CLOSE</Text></Pressable>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
 
-const InfoRow = ({ icon, label, value }: { icon: any, label: string, value: string }) => (
-  <View style={styles.modalRow}>
-    <View style={styles.modalLabelGroup}>{icon}<Text style={styles.modalLabelText}>{label}</Text></View>
-    <Text style={styles.modalValueText} numberOfLines={1}>{value}</Text>
-  </View>
-);
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
-  content: { padding: 20 },
+  content: { padding: 15 },
   titleText: { fontSize: 22, fontWeight: '900', color: '#0F172A', marginBottom: 20 },
-  schedulingBox: { padding: 15, backgroundColor: '#FFF', borderRadius: 12, borderWidth: 1, borderColor: colors.primary, marginBottom: 25, borderStyle: 'dashed' },
-  boxTitle: { fontSize: 9, fontWeight: '800', color: colors.primary, marginBottom: 10 },
-  formRow: { flexDirection: 'row', gap: 6 },
-  dropdownWrapper: { flex: 1, position: 'relative' },
-  formDropdown: { borderWidth: 1, borderColor: '#E2E8F0', padding: 10, borderRadius: 8, backgroundColor: '#F8FAFC', height: 40, justifyContent: 'center' },
-  selectedText: { fontSize: 10, fontWeight: '700' },
-  floatingMenu: { position: 'absolute', top: 45, left: 0, right: 0, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, zIndex: 9999, elevation: 5 },
+  schedulingBox: { padding: 15, backgroundColor: '#FFF', borderRadius: 12, marginBottom: 25, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, elevation: 3 },
+  boxTitle: { fontSize: 10, fontWeight: '800', color: colors.primary, marginBottom: 12 },
+  formRow: { flexDirection: 'row', gap: 10 },
+  inputWrapper: { flex: 1, position: 'relative' },
+  formDropdown: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#E2E8F0', paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#F8FAFC', height: 45 },
+  selectedText: { fontSize: 12, fontWeight: '600', color: '#1E293B' },
+  floatingMenu: { position: 'absolute', top: 50, left: 0, right: 0, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, zIndex: 10001, elevation: 5 },
   menuItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  menuItemText: { fontSize: 11, fontWeight: '700' },
-  addBtn: { paddingHorizontal: 15, borderRadius: 8, justifyContent: 'center' },
-  addBtnText: { color: '#FFF', fontSize: 10, fontWeight: '800' },
+  menuItemText: { fontSize: 12, fontWeight: '600', color: '#1E293B' },
+  addBtn: { paddingHorizontal: 20, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  addBtnText: { color: '#FFF', fontWeight: '800', fontSize: 11 },
+
   dateSection: { marginBottom: 30 },
   dateHeaderLabel: { backgroundColor: colors.primary, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, marginBottom: 10 },
   dateHeaderText: { color: '#FFF', fontSize: 10, fontWeight: '900' },
   tableCard: { backgroundColor: '#FFF', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' },
-  tableHeader: { flexDirection: 'row', backgroundColor: '#F8FAFC', padding: 12, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
-  th: { fontSize: 9, fontWeight: '800', color: '#94A3B8' },
-  tableRow: { flexDirection: 'row', padding: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', alignItems: 'center', backgroundColor: '#FFF' },
-  avatarMiniFrame: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#F1F5F9', overflow: 'hidden', borderWidth: 1, borderColor: '#E2E8F0' },
+  tableHeader: { flexDirection: 'row', backgroundColor: '#F8FAFC', paddingVertical: 12, paddingHorizontal: 15, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+  thName: { flex: 1, fontSize: 10, fontWeight: '800', color: '#94A3B8' },
+  thStatus: { fontSize: 10, fontWeight: '800', color: '#94A3B8', textAlign: 'center' },
+  thAction: { fontSize: 10, fontWeight: '800', color: '#94A3B8', textAlign: 'right' },
+  tableRow: { flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 15, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', alignItems: 'center' },
+  nameCol: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  statusCol: { alignItems: 'center', justifyContent: 'center' },
+  actionCol: { alignItems: 'flex-end' },
+  avatarWrapper: { width: 34, height: 34, borderRadius: 10, overflow: 'hidden', backgroundColor: '#F1F5F9' },
   avatarMiniImage: { width: '100%', height: '100%' },
   avatarInitialBox: { width: '100%', height: '100%', backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
-  avatarInitialText: { color: '#FFF', fontSize: 14, fontWeight: '800' },
-  memberName: { fontSize: 13, fontWeight: '700', color: '#1E293B' },
-  roleSubtext: { fontSize: 10, color: '#64748B' },
-  statusLabel: { fontSize: 10, fontWeight: '900' },
-  editBtn: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0' },
-  editBtnText: { fontSize: 9, fontWeight: '800', color: '#475569' },
-  tableFloatingMenu: { position: 'absolute', top: 35, right: 0, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, zIndex: 150, width: 140, elevation: 10 },
-  
-  // DELETE & SKELETON STYLES
-  confirmDeleteText: { fontSize: 9, fontWeight: '900', color: '#DC2626' },
-  confirmBtn: { backgroundColor: '#DC2626', padding: 8, borderRadius: 8 },
-  cancelBtn: { backgroundColor: '#E2E8F0', padding: 8, borderRadius: 8 },
-  skeletonRow: { opacity: 0.6, backgroundColor: '#F1F5F9' },
-  skeletonAvatar: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#E2E8F0' },
-  skeletonTextLong: { width: '80%', height: 10, backgroundColor: '#E2E8F0', borderRadius: 4, marginBottom: 6 },
-  skeletonTextShort: { width: '40%', height: 8, backgroundColor: '#E2E8F0', borderRadius: 4 },
-  skeletonBadge: { width: 50, height: 12, backgroundColor: '#E2E8F0', borderRadius: 10 },
-
-  // MODAL STYLES
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContainer: { width: '100%', maxWidth: 400, backgroundColor: '#FFF', borderRadius: 24, padding: 20 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 12, fontWeight: '900', color: '#94A3B8' },
-  modalProfileContent: { alignItems: 'center', marginBottom: 25 },
-  modalAvatarCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', marginBottom: 12 },
-  modalAvatarImg: { width: '100%', height: '100%' },
-  modalAvatarInitial: { color: '#FFF', fontSize: 32, fontWeight: '900' },
-  modalName: { fontSize: 20, fontWeight: '800', color: '#0F172A' },
-  modalBadge: { backgroundColor: '#F1F5F9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginTop: 6 },
-  modalBadgeText: { fontSize: 10, fontWeight: '800', color: '#64748B' },
-  modalInfoList: { backgroundColor: '#F8FAFC', borderRadius: 16, padding: 15, gap: 15 },
-  modalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  modalLabelGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  modalLabelText: { fontSize: 9, fontWeight: '800', color: '#94A3B8' },
-  modalValueText: { fontSize: 13, fontWeight: '700', color: '#1E293B', flex: 1, textAlign: 'right', marginLeft: 20 },
-  closeBtn: { backgroundColor: '#0F172A', paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginTop: 20 },
-  closeBtnText: { color: '#FFF', fontSize: 12, fontWeight: '800' }
+  avatarInitialText: { color: '#FFF', fontWeight: '800', fontSize: 12 },
+  nameTextWrapper: { marginLeft: 10, flex: 1 },
+  memberName: { fontWeight: '700', color: '#1E293B' },
+  roleSubtext: { color: '#64748B' },
+  statusLabel: { fontWeight: '900' },
+  actionGroup: { flexDirection: 'row', gap: 6 },
+  editBtn: { paddingVertical: 5, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFF' },
+  editBtnText: { fontWeight: '800', color: '#475569' },
+  deleteBtn: { padding: 6, borderRadius: 6, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FEE2E2' },
+  confirmBtn: { padding: 6, borderRadius: 6, width: 30, alignItems: 'center' },
+  tableFloatingMenu: { position: 'absolute', top: 35, right: 0, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, zIndex: 1000, width: 130, elevation: 10 },
 });
