@@ -32,17 +32,18 @@ export default function HomeScreen() {
         
         {/* --- HERO SECTION --- */}
         <View style={styles.heroSection}>
-          <Text style={styles.churchName}>WCAM CHURCH</Text>
+          <Text style={styles.churchName}>GREAT AWAKENING CHURCH</Text>
           <Text style={styles.heroHeadline}>
             A community built on faith, hope, and unconditional love.
           </Text>
-          <View style={styles.line} />
+          
         </View>
 
         {/* --- MISSION SECTION --- */}
         <View style={styles.section}>
           <Text style={styles.label}>OUR MISSION</Text>
           <Text style={styles.bodyText}>
+            (eample)
             To spread the gospel of Jesus Christ, making disciples of all nations, 
             and empowering every believer to serve with a heart of compassion 
             and excellence in every area of life.
@@ -53,6 +54,7 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <Text style={styles.label}>OUR VISION</Text>
           <Text style={styles.bodyText}>
+            (example)
             We envision a transformed generation united in spirit, 
             growing in the knowledge of God, and becoming a light 
             of hope to the broken and the lost.
@@ -65,7 +67,7 @@ export default function HomeScreen() {
           
           <View style={styles.goalItem}>
             <Text style={styles.goalTitle}>Spiritual Maturity</Text>
-            <Text style={styles.goalDesc}>Nurturing every member through biblical teaching and prayerful living.</Text>
+            <Text style={styles.goalDesc}>Make every believer to be a deciple maker.</Text>
           </View>
 
           <View style={styles.goalItem}>

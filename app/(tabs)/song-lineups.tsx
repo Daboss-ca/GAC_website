@@ -70,7 +70,11 @@ export default function SongLineupScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.content, isMobile && { padding: 20 }]}>
+      {/* Ginawang ScrollView ang main wrapper para sa buong screen scroll */}
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scrollContent, isMobile && { padding: 20 }]}
+      >
         
         {/* HEADER */}
         <View style={styles.header}>
@@ -83,14 +87,14 @@ export default function SongLineupScreen() {
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
         ) : (
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <View>
             {lineups.length === 0 ? (
               <View style={styles.emptyContainer}>
                   <Text style={styles.emptyText}>No lineups posted yet.</Text>
               </View>
             ) : (
               <View style={styles.tableCard}>
-                {/* TABLE HEADER */}
+                {/* TABLE HEADER - Desktop Only */}
                 {!isMobile && (
                   <View style={styles.tableHeader}>
                     <Text style={[styles.th, { flex: 2 }]}>DATE & SERVICE</Text>
@@ -134,10 +138,10 @@ export default function SongLineupScreen() {
                           style={styles.actionBtn}
                         >
                           <Youtube size={16} color={colors.primary} />
-                          {isMobile && <Text style={styles.actionBtnText}>Reference</Text>}
+                          {isMobile && <Text style={styles.actionBtnText}>Reference Link</Text>}
                         </Pressable>
                       ) : (
-                        <View style={{ width: 30 }} />
+                        <View style={!isMobile && { width: 30 }} />
                       )}
                     </View>
 
@@ -145,21 +149,24 @@ export default function SongLineupScreen() {
                 ))}
               </View>
             )}
-          </ScrollView>
+          </View>
         )}
-      </View>
+        
+        {/* Padding Bottom para hindi dikit sa edge */}
+        <View style={{ height: 100 }} />
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFFFFF" },
-  content: { padding: 40 },
+  // Inilipat ang padding sa contentContainer ng ScrollView
+  scrollContent: { padding: 40 },
   header: { marginBottom: 40 },
   title: { fontSize: 32, fontWeight: "900", color: '#0F172A', letterSpacing: -1 },
   subtitle: { color: "#64748B", fontSize: 16, fontWeight: '500' },
   
-  // TABLE STYLES
   tableCard: { 
     borderTopWidth: 1, 
     borderTopColor: '#F1F5F9' 
@@ -184,7 +191,6 @@ const styles = StyleSheet.create({
     alignItems: 'center' 
   },
 
-  // COLUMN STYLES
   dateLabel: { 
     fontSize: 12, 
     fontWeight: '800', 
@@ -208,7 +214,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic' 
   },
 
-  // SONG PILLS
   songPill: { 
     flexDirection: 'row', 
     alignItems: 'center', 
@@ -231,7 +236,8 @@ const styles = StyleSheet.create({
   },
 
   actionBtn: { 
-    padding: 10, 
+    paddingVertical: 10,
+    paddingHorizontal: 15, 
     borderRadius: 12, 
     backgroundColor: '#F1F5F9',
     flexDirection: 'row',
@@ -239,7 +245,6 @@ const styles = StyleSheet.create({
     gap: 8
   },
 
-  // MOBILE ADAPTATION
   mobileRow: { 
     flexDirection: 'column', 
     alignItems: 'flex-start', 
