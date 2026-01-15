@@ -1,13 +1,14 @@
 {
   "expo": {
-    "name": "gac-app",
-    "slug": "gac-app",
+    "name": "GAC_website",
+    "slug": "GAC_website",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "gacapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "platforms": ["ios", "android", "web"],
     "ios": {
       "supportsTablet": true
     },
@@ -23,7 +24,8 @@
     },
     "web": {
       "output": "static",
-      "baseUrl": "/GAC_website"
+      "baseUrl": "/GAC_website",
+      "publicPath": "./"
     },
     "plugins": [
       "expo-router",
